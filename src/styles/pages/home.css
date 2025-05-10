@@ -1,0 +1,49 @@
+.home-page {
+    animation: fadeIn 0.5s ease forwards;
+  }
+  
+  .stories-list {
+    margin-top: 30px;
+  }
+  
+  .stories-list .loader {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100px;
+  }
+  
+  .stories-list .loader::after {
+    content: "";
+    width: 50px;
+    height: 50px;
+    border: 6px solid var(--secondary-color);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  .empty-state {
+    background-color: var(--light-color);
+    padding: 30px;
+    border: var(--border-width) solid var(--dark-color);
+    text-align: center;
+    margin: 30px 0;
+    font-weight: bold;
+    box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--dark-color);
+  }
+  
+  .error-message {
+    background-color: #FFEEEE;
+    padding: 20px;
+    border: var(--border-width) solid var(--primary-color);
+    text-align: center;
+    margin: 30px 0;
+    font-weight: bold;
+    color: var(--primary-color);
+    box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--dark-color);
+  }

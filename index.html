@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Aplikasi berbagi cerita - Dicoding Story" />
+    <meta name="theme-color" content="#47D7AC" />
+    <link rel="shortcut icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
+    <link rel="manifest" href="/app.webmanifest">
+    <title>Dicoding Story App</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    
+    <script type="module" src="./src/scripts/index.js"></script>
+  </head>
+  <body>
+    <!-- Skip to content untuk aksesibilitas -->
+    <a href="#main-content" class="skip-link">Langsung ke konten utama</a>
+    
+    <header>
+      <div class="main-header container">
+        <a class="brand-name" href="#/">Dicoding Story</a>
+
+        <nav id="navigation-drawer" class="navigation-drawer">
+          <ul id="nav-list" class="nav-list">
+            <li><a href="#/"><i class="fas fa-home"></i> Beranda</a></li>
+            <li><a href="#/add"><i class="fas fa-plus-circle"></i> Tambah Cerita</a></li>
+            <li><a href="#/about"><i class="fas fa-info-circle"></i> Tentang</a></li>
+            <li id="auth-nav-item">
+              <!-- Akan diisi oleh JavaScript berdasarkan status login -->
+              <a href="#/login"><i class="fas fa-sign-in-alt"></i> Masuk</a>
+            </li>
+          </ul>
+        </nav>
+
+        <button id="drawer-button" class="drawer-button" aria-label="Menu Navigasi">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+    </header>
+
+    <main id="main-content" class="main-content" tabindex="-1"></main>
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  </body>
+</html>

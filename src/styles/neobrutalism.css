@@ -1,0 +1,242 @@
+:root {
+    /* Warna yang lebih cerah dan kontras */
+    --primary-color: #FF5C5C;
+    --secondary-color: #47D7AC;
+    --accent-color: #FFD53D;
+    --dark-color: #2D2D2D;
+    --light-color: #F7F7F7;
+    
+    /* Properti neobrutalism yang lebih jelas */
+    --shadow-offset: 6px;
+    --border-width: 3px;
+    --border-radius: 0px;
+    --input-height: 50px;
+    --button-height: 50px;
+    --transition-speed: 0.25s;
+  }
+  
+  /* Neobrutalism Typography */
+  body {
+    font-family: 'Arial', sans-serif;
+    background-color: var(--light-color);
+    color: var(--dark-color);
+    line-height: 1.6;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.5px;
+  }
+  
+  /* Neobrutalism Buttons */
+  .btn {
+    background-color: var(--primary-color);
+    color: white;
+    border: var(--border-width) solid var(--dark-color);
+    padding: 12px 24px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--dark-color);
+    transition: all var(--transition-speed) ease;
+    position: relative;
+    height: var(--button-height);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .btn:hover {
+    transform: translate(-4px, -4px);
+    box-shadow: calc(var(--shadow-offset) + 4px) calc(var(--shadow-offset) + 4px) 0 var(--dark-color);
+  }
+  
+  .btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: calc(var(--shadow-offset) - 2px) calc(var(--shadow-offset) - 2px) 0 var(--dark-color);
+  }
+  
+  .btn-secondary {
+    background-color: var(--secondary-color);
+  }
+  
+  .btn-accent {
+    background-color: var(--accent-color);
+    color: var(--dark-color);
+  }
+  
+  .btn-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .btn-with-icon i {
+    font-size: 18px;
+  }
+  
+  /* Neobrutalism Cards */
+  .card {
+    background-color: white;
+    border: var(--border-width) solid var(--dark-color);
+    box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--dark-color);
+    padding: 25px;
+    margin-bottom: 30px;
+    position: relative;
+    transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+  }
+  
+  .card:hover {
+    transform: translate(-4px, -4px);
+    box-shadow: calc(var(--shadow-offset) + 4px) calc(var(--shadow-offset) + 4px) 0 var(--dark-color);
+  }
+  
+  /* Neobrutalism Form Elements */
+  input, textarea, select {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border: var(--border-width) solid var(--dark-color);
+    background-color: white;
+    height: var(--input-height);
+    box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--dark-color);
+  }
+  
+  textarea {
+    min-height: 150px;
+    padding: 15px;
+    line-height: 1.6;
+    height: auto;
+    resize: vertical;
+  }
+  
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--secondary-color);
+  }
+  
+  label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: var(--dark-color);
+  }
+  
+  /* Accessibility: Skip to content - IMPROVED */
+  .skip-link {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    padding: 10px 15px;
+    background-color: var(--accent-color);
+    color: var(--dark-color);
+    z-index: 10000;
+    border: var(--border-width) solid var(--dark-color);
+    box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--dark-color);
+    transform: translateY(-200%);
+    transition: transform 0.3s;
+    font-weight: bold;
+    font-size: 14px;
+    text-decoration: none;
+  }
+  
+  .skip-link:focus {
+    transform: translateY(0);
+    outline: none;
+  }
+  
+  /* Custom animation styles */
+  .fade-transition {
+    animation: fadeIn 0.5s ease forwards;
+  }
+  
+  .slide-right-transition {
+    animation: slideInRight 0.5s ease forwards;
+  }
+  
+  .slide-up-transition {
+    animation: slideInUp 0.5s ease forwards;
+  }
+  
+  .zoom-in-transition {
+    animation: zoomIn 0.5s ease forwards;
+  }
+  
+  /* Transitions for view transitions API */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slideInRight {
+    from { transform: translateX(100px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  
+  @keyframes slideInLeft {
+    from { transform: translateX(-100px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  
+  @keyframes slideInUp {
+    from { transform: translateY(50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  
+  @keyframes zoomIn {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  
+  .page-transition {
+    view-transition-name: page;
+  }
+  
+  /* View Transition Styles */
+  ::view-transition-old(page),
+  ::view-transition-new(page) {
+    animation-duration: 0.5s;
+  }
+  
+  ::view-transition-old(page) {
+    animation-name: fadeOut;
+  }
+  
+  ::view-transition-new(page) {
+    animation-name: fadeIn;
+  }
+  
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  
+  /* Media Queries for Responsive Design */
+  @media screen and (max-width: 768px) {
+    :root {
+      --shadow-offset: 4px;
+      --border-width: 2px;
+    }
+    
+    .card {
+      padding: 15px;
+    }
+  }
+  
+  @media screen and (max-width: 480px) {
+    :root {
+      --shadow-offset: 3px;
+    }
+    
+    .btn {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    
+    .page-title {
+      font-size: 24px;
+    }
+  }

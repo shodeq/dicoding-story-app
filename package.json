@@ -1,0 +1,28 @@
+{
+  "name": "story-app",
+  "version": "1.0.0",
+  "description": "Dicoding Story App",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "start-dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview"
+  },
+  "author": "Alfian Anwar Shodiqi",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "vite-plugin-pwa": "^0.17.0",
+    "workbox-window": "^7.0.0"
+  },
+  "dependencies": {
+    "idb": "^7.1.1",
+    "regenerator-runtime": "^0.14.0",
+    "workbox-core": "^7.0.0",
+    "workbox-expiration": "^7.0.0",
+    "workbox-precaching": "^7.0.0",
+    "workbox-routing": "^7.0.0",
+    "workbox-strategies": "^7.0.0"
+  }
+}

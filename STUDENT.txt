@@ -1,0 +1,2 @@
+APP_URL=https://your-story-app-deployment-url.netlify.app
+MAP_SERVICE_API_KEY=your_map_api_key_if_needed
