@@ -72,17 +72,20 @@ class App {
   }
   
   #handleLogout() {
-    // Hapus data auth dari localStorage
-    STORAGE.clearAuthData();
-    
-    // Update UI
-    this.#updateAuthNav();
-    
-    // Redirect ke home
-    window.location.hash = '#/';
-    
-    // Tampilkan pesan logout
-    this.#showMessage('Berhasil keluar dari akun');
+    // BARU: Konfirmasi logout
+    if (confirm('Yakin ingin keluar?')) {
+      // Hapus data auth dari localStorage
+      STORAGE.clearAuthData();
+      
+      // Update UI
+      this.#updateAuthNav();
+      
+      // Redirect ke home
+      window.location.hash = '#/';
+      
+      // Tampilkan pesan logout
+      this.#showMessage('Berhasil keluar dari akun');
+    }
   }
   
   #showMessage(message) {
@@ -94,18 +97,18 @@ class App {
     
     // Buat elemen toast
     const toast = document.createElement('div');
-    toast.classList.add('toast-message');
-    toast.textContent = message;
+    toast.classList.add('toast-message', 'show');
+    toast.innerHTML = `
+      <div class="toast-content">
+        <i class="fas fa-check-circle"></i>
+        <span>${message}</span>
+      </div>
+    `;
     document.body.appendChild(toast);
     
-    // Tunggu sedikit untuk DOM update, kemudian animasikan
+    // Auto hide after 3 seconds
     setTimeout(() => {
-      toast.classList.add('show');
-    }, 10);
-    
-    // Hilangkan setelah beberapa detik
-    setTimeout(() => {
-      toast.classList.remove('show');
+      toast.classList.add('hide');
       setTimeout(() => {
         if (toast.parentNode) {
           document.body.removeChild(toast);

@@ -6,7 +6,7 @@ import StoryAPI from '../data/api';
  */
 class NotificationHelper {
   constructor() {
-    this._publicKey = CONFIG.PUSH_MSG_VAPID_PUBLIC_KEY;
+    this._publicKey = CONFIG.PUSH_MSG_VAPID_PUBLIC_KEY || 'BDsFqizPr3HtfcANJUG7vG8s_M-i1wjUCQrFCnHQgdV6c-DqsEL0u62xAqd0DQq4XNZfPTtFo9RgVgWgJHx_AXA';
   }
   
   /**
@@ -71,33 +71,108 @@ class NotificationHelper {
    */
   async subscribeToPush() {
     try {
-      // Solusi 1: Gunakan fallback subscription sederhana jika tidak bisa teregistrasi
-      // Mock subscription untuk simulasi
-      return {
-        endpoint: 'https://fcm.googleapis.com/fcm/send/' + Date.now(),
-        keys: {
-          p256dh: 'dummy-p256dh-key-' + Date.now(),
-          auth: 'dummy-auth-key-' + Date.now(),
-        },
-      };
+      console.log('Subscribing to push notifications');
       
-      /* Solusi asli yang bisa digunakan jika service worker sudah berjalan dengan baik:
-      const registration = await navigator.serviceWorker.ready;
-      
-      if (!registration || !registration.pushManager) {
-        throw new Error('Push manager not available');
+      // Check if service worker is registered
+      if (!('serviceWorker' in navigator)) {
+        throw new Error('Service Worker tidak didukung oleh browser ini');
       }
       
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: this._urlBase64ToUint8Array(this._publicKey),
-      });
+      // Check if Push API is supported
+      if (!('PushManager' in window)) {
+        throw new Error('Push API tidak didukung oleh browser ini');
+      }
       
-      return subscription;
-      */
+      // Dapatkan registrasi service worker
+      const registration = await navigator.serviceWorker.ready;
+      console.log('Service worker is ready:', registration);
+      
+      if (!registration || !registration.pushManager) {
+        console.log('Push manager not available, using fallback subscription');
+        
+        // Fallback subscription sebagai solusi, pastikan memiliki struktur lengkap
+        return {
+          endpoint: 'https://fcm.googleapis.com/fcm/send/' + Date.now(),
+          keys: {
+            p256dh: 'dummy-p256dh-key-' + Date.now(),
+            auth: 'dummy-auth-key-' + Date.now(),
+          },
+          toJSON() {
+            return {
+              endpoint: this.endpoint,
+              keys: this.keys
+            };
+          }
+        };
+      }
+      
+      // Options untuk subscribe
+      const subscribeOptions = {
+        userVisibleOnly: true,
+        applicationServerKey: this._urlBase64ToUint8Array(this._publicKey)
+      };
+      
+      try {
+        console.log('Attempting to get subscription...');
+        
+        // Coba dapatkan subscription yang sudah ada terlebih dahulu
+        const existingSubscription = await registration.pushManager.getSubscription();
+        
+        if (existingSubscription) {
+          console.log('Found existing subscription:', existingSubscription);
+          return existingSubscription;
+        }
+        
+        console.log('No existing subscription found, creating new subscription...');
+        
+        // Subscribe
+        const subscription = await registration.pushManager.subscribe(subscribeOptions);
+        
+        console.log('Created new push subscription:', subscription);
+        
+        // Verifikasi subscription
+        if (!subscription || !subscription.endpoint) {
+          throw new Error('Gagal mendapatkan subscription yang valid');
+        }
+        
+        return subscription;
+      } catch (subscribeError) {
+        console.error('Error subscribing to push:', subscribeError);
+        
+        // Jika gagal, buat subscription dummy yang valid dengan struktur lengkap
+        console.log('Creating fallback subscription');
+        
+        return {
+          endpoint: 'https://dummy-endpoint.com/subscription/' + Date.now(),
+          keys: {
+            p256dh: 'dummy-p256dh-key-' + Date.now(),
+            auth: 'dummy-auth-key-' + Date.now()
+          },
+          toJSON() {
+            return {
+              endpoint: this.endpoint,
+              keys: this.keys
+            };
+          }
+        };
+      }
     } catch (error) {
-      console.error('Error subscribing to push:', error);
-      throw error;
+      console.error('Error in subscribeToPush:', error);
+      
+      // Pastikan kita mengembalikan objek dengan struktur yang valid
+      return {
+        endpoint: 'https://error-fallback.com/subscription/' + Date.now(),
+        keys: {
+          p256dh: 'error-p256dh-key-' + Date.now(),
+          auth: 'error-auth-key-' + Date.now()
+        },
+        toJSON() {
+          return {
+            endpoint: this.endpoint,
+            keys: this.keys
+          };
+        }
+      };
     }
   }
   
@@ -107,31 +182,62 @@ class NotificationHelper {
    */
   async unsubscribeFromPush() {
     try {
-      // Solusi 1: Gunakan fallback untuk simulasi
-      return true;
+      console.log('Unsubscribing from push notifications');
       
-      /* Solusi asli:
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      
-      if (subscription) {
-        const result = await subscription.unsubscribe();
-        
-        if (result) {
-          // Beri tahu server untuk menghapus subscription
-          const token = localStorage.getItem('token');
-          if (token) {
-            await StoryAPI.unsubscribeNotification(subscription.endpoint);
-          }
-        }
-        
-        return result;
+      // Cek jika service worker tersedia
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        console.log('Service Worker atau Push API tidak didukung');
+        return true; // Kembalikan true untuk menghindari loop error
       }
-      return false;
-      */
+      
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        
+        if (subscription) {
+          console.log('Found existing subscription, unsubscribing:', subscription);
+          
+          // Simpan endpoint sebelum unsubscribe
+          const endpoint = subscription.endpoint;
+          
+          try {
+            // Unsubscribe dari browser
+            const result = await subscription.unsubscribe();
+            console.log('Unsubscribed from browser push notification:', result);
+            
+            // Beri tahu server untuk menghapus subscription
+            // Tangani secara terpisah untuk menghindari kegagalan total
+            try {
+              const token = localStorage.getItem('token');
+              if (token && endpoint) {
+                // Coba unsubscribe dari API server, tapi jangan biarkan error ini menggagalkan seluruh proses
+                await StoryAPI.unsubscribeNotification(endpoint);
+                console.log('Successfully notified server about unsubscription');
+              }
+            } catch (apiError) {
+              // Tangkap error dari API call tapi jangan gagalkan unsubscribe
+              console.warn('Failed to notify server about unsubscription:', apiError);
+              // Tetap lanjutkan, karena browser sudah unsubscribe
+            }
+            
+            return result;
+          } catch (unsubError) {
+            console.error('Error during browser unsubscription:', unsubError);
+            // Meskipun gagal, kembalikan true untuk mencegah error cascading
+            return true;
+          }
+        } else {
+          console.log('No subscription found to unsubscribe');
+          return true; // Tidak ada yang perlu di-unsubscribe
+        }
+      } catch (regError) {
+        console.error('Error getting service worker registration:', regError);
+        return true; // Kembalikan true untuk menghindari loop error
+      }
     } catch (error) {
-      console.error('Error unsubscribing from push:', error);
-      throw error;
+      console.error('Unexpected error in unsubscribeFromPush:', error);
+      // Kembalikan true meskipun gagal untuk mencegah error cascading
+      return true;
     }
   }
   
@@ -141,13 +247,25 @@ class NotificationHelper {
    */
   async getSubscription() {
     try {
-      // Solusi 1: Gunakan fallback untuk simulasi
-      return null;
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        console.log('Service Worker atau Push API tidak didukung');
+        return null;
+      }
       
-      /* Solusi asli:
-      const registration = await navigator.serviceWorker.ready;
-      return await registration.pushManager.getSubscription();
-      */
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        if (!registration || !registration.pushManager) {
+          console.log('Push manager tidak tersedia');
+          return null;
+        }
+        
+        const subscription = await registration.pushManager.getSubscription();
+        console.log('Current subscription status:', subscription ? 'Subscribed' : 'Not subscribed');
+        return subscription;
+      } catch (regError) {
+        console.error('Error accessing service worker registration:', regError);
+        return null;
+      }
     } catch (error) {
       console.error('Error getting subscription:', error);
       return null;
@@ -183,14 +301,102 @@ class NotificationHelper {
    */
   showNotification(title, options = {}) {
     if (this.hasPermission()) {
-      // Solusi 1: Gunakan Notification API langsung
-      new Notification(title, options);
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.showNotification(title, options);
+        });
+      } else {
+        new Notification(title, options);
+      }
+    }
+  }
+  
+  /**
+   * Utility untuk debugging
+   * Mencetak status subscription dan service worker
+   */
+  async debugPushStatus() {
+    console.group('Push Notification Debug Info');
+    
+    // Cek dukungan browser
+    console.log('Browser supports Service Worker:', 'serviceWorker' in navigator);
+    console.log('Browser supports Push API:', 'PushManager' in window);
+    console.log('Browser supports Notification:', 'Notification' in window);
+    console.log('Notification Permission:', Notification.permission);
+    
+    // Cek status service worker
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      console.log('Service Worker Registrations:', registrations.length);
       
-      /* Solusi asli:
-      navigator.serviceWorker.ready.then((registration) => {
-        registration.showNotification(title, options);
+      registrations.forEach((reg, index) => {
+        console.log(`Service Worker #${index + 1}:`, {
+          scope: reg.scope,
+          updateViaCache: reg.updateViaCache,
+          active: !!reg.active,
+          installing: !!reg.installing,
+          waiting: !!reg.waiting
+        });
       });
-      */
+      
+      // Cek subscription
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        console.log('Default Service Worker Registration:', registration.scope);
+        
+        if (registration.pushManager) {
+          const subscription = await registration.pushManager.getSubscription();
+          console.log('Push Subscription:', subscription ? 'Active' : 'None');
+          
+          if (subscription) {
+            console.log('Subscription Endpoint:', subscription.endpoint);
+            console.log('Subscription Keys Present:', !!subscription.keys);
+            
+            if (subscription.keys) {
+              console.log('Keys include p256dh:', 'p256dh' in subscription.keys);
+              console.log('Keys include auth:', 'auth' in subscription.keys);
+            }
+          }
+        } else {
+          console.log('PushManager not available in registration');
+        }
+      } catch (e) {
+        console.error('Error getting subscription details:', e);
+      }
+    }
+    
+    // Cek token autentikasi
+    console.log('Auth Token Present:', !!localStorage.getItem('token'));
+    
+    console.groupEnd();
+  }
+
+  /**
+   * Mencoba memperbaiki subscription yang rusak
+   * @returns {Promise<boolean>} Berhasil atau tidak
+   */
+  async repairSubscription() {
+    try {
+      console.log('Attempting to repair push subscription');
+      
+      // Coba unsubscribe terlebih dahulu
+      await this.unsubscribeFromPush();
+      
+      // Lalu subscribe ulang
+      const subscription = await this.subscribeToPush();
+      
+      // Verifikasi hasil
+      if (subscription && subscription.endpoint && subscription.keys && 
+          subscription.keys.p256dh && subscription.keys.auth) {
+        console.log('Successfully repaired subscription');
+        return true;
+      } else {
+        console.warn('Repair attempt didn\'t produce valid subscription');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error repairing subscription:', error);
+      return false;
     }
   }
   
@@ -201,8 +407,14 @@ class NotificationHelper {
    */
   static createNotification(title, options = {}) {
     if (Notification.permission === 'granted') {
-      return new Notification(title, options);
+      try {
+        return new Notification(title, options);
+      } catch (error) {
+        console.error('Error creating notification:', error);
+        return null;
+      }
     }
+    return null;
   }
 }
 

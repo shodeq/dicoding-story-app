@@ -338,27 +338,70 @@ header {
   flex-wrap: wrap;
 }
 
-/* Toast Message */
+/* =========================================== */
+/* 🔄 DIPERBAIKI: Toast Message Styles */
+/* =========================================== */
 .toast-message {
   position: fixed;
   top: 20px;
   right: 20px;
-  padding: 12px 20px;
   background-color: #333;
-  color: white;
+  border: var(--border-width) solid var(--dark-color);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--dark-color);
   border-radius: 5px;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-  z-index: 9999;
-  transform: translateX(120%);
+  overflow: hidden;
+  z-index: 10000;
+  transform: translateX(100%);
   transition: transform 0.3s ease-out;
+  min-width: 300px;
+  max-width: 500px;
 }
 
 .toast-message.show {
   transform: translateX(0);
 }
 
+.toast-message.hide {
+  transform: translateX(100%);
+}
+
 .toast-message.error {
   background-color: #ff3b30;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 20px;
+  color: white;
+}
+
+.toast-content i {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.toast-content span {
+  flex: 1;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* ========================================= */
+/* 🔄 DIPERBAIKI: Button Disabled State */
+/* ========================================= */
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--dark-color) !important;
+  pointer-events: none;
+}
+
+.btn:disabled:hover {
+  transform: none !important;
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--dark-color) !important;
 }
 
 /* Success Dialog */
@@ -615,6 +658,22 @@ header {
   .tech-stack {
     grid-template-columns: 1fr;
   }
+  
+  /* Toast responsive */
+  .toast-message {
+    left: 20px;
+    right: 20px;
+    width: auto;
+    transform: translateY(-100%);
+  }
+  
+  .toast-message.show {
+    transform: translateY(0);
+  }
+  
+  .toast-message.hide {
+    transform: translateY(-100%);
+  }
 }
 
 @media screen and (max-width: 480px) {
@@ -634,4 +693,225 @@ header {
     width: 90%;
     padding: 20px;
   }
+  
+  /* Stories actions responsive */
+  .stories-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .action-group {
+    flex-direction: column;
+  }
+  
+  .view-options {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
 }
+
+/* ===================================== */
+/* 🔄 TAMBAHAN: Animation untuk Refresh */
+/* ===================================== */
+@keyframes refreshSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.btn .fa-sync-alt.fa-spin {
+  animation: refreshSpin 1s linear infinite;
+}
+
+/* ========================================= */
+/* 🔄 TAMBAHAN: Smooth transitions */
+/* ========================================= */
+.stories-list {
+  transition: opacity 0.3s ease;
+}
+
+.stories-list.loading {
+  opacity: 0.6;
+}
+
+/* ========================================= */
+/* 🔄 TAMBAHAN: Focus states untuk accessibility */
+/* ========================================= */
+.btn:focus-visible {
+  outline: 3px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+button:focus-visible {
+  outline: 3px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+/* ========================================= */
+/* 🔄 TAMBAHAN: Loading state untuk refresh button */
+/* ========================================= */
+#refresh-stories.loading {
+  position: relative;
+}
+
+#refresh-stories.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+
+/* ========================================= */
+/* 🔄 BARU: Enhanced Modal Styles */
+/* ========================================= */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10001;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.modal-container {
+  background-color: white;
+  border: var(--border-width) solid var(--dark-color);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--dark-color);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: modalSlideIn 0.3s ease;
+}
+
+.modal-header {
+  padding: 20px;
+  border-bottom: var(--border-width) solid var(--dark-color);
+  background-color: var(--secondary-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-title {
+  font-size: 1.5rem;
+  margin: 0;
+  color: var(--dark-color);
+  flex: 1;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--dark-color);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+}
+
+.modal-close:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.modal-body {
+  padding: 25px;
+}
+
+.modal-message {
+  margin: 0;
+  line-height: 1.6;
+  color: var(--dark-color);
+  font-size: 1.1rem;
+}
+
+.modal-footer {
+  padding: 20px;
+  border-top: var(--border-width) solid var(--dark-color);
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  background-color: var(--light-color);
+}
+
+.modal-footer .btn {
+  flex-shrink: 0;
+}
+
+@keyframes modalSlideIn {
+  from { 
+    transform: scale(0.8) translateY(-20px); 
+    opacity: 0; 
+  }
+  to { 
+    transform: scale(1) translateY(0); 
+    opacity: 1; 
+  }
+}
+
+/* Modal Icons */
+.modal-overlay .btn-with-icon i {
+  margin-right: 8px;
+}
+
+/* Modal responsive */
+@media screen and (max-width: 480px) {
+  .modal-container {
+    margin: 20px;
+    max-height: calc(100vh - 40px);
+  }
+  
+  .modal-footer {
+    flex-direction: column;
+  }
+  
+  .modal-footer .btn {
+    width: 100%;
+  }
+  
+  .modal-header {
+    padding: 15px;
+  }
+  
+  .modal-body {
+    padding: 20px;
+  }
+  
+  .modal-title {
+    font-size: 1.3rem;
+  }
+}
+
+/* Fix for notification button loading state */
+#notification-button.loading {
+  position: relative;
+}
+
+#notification-button.loading i {
+  animation: spin 1s linear infinite;
+}
+
+/* Additional notification button states */
+#notification-button:disabled {
+  opacity: 0.7;
+}
+
+#notification-button.active {
+  background-color: var(--secondary-color);
+  color: var(--dark-color);
+}
+

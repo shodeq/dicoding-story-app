@@ -18,6 +18,9 @@ class LoginPresenter {
           name: result.loginResult.name,
         });
         
+        // BARU: Set flag untuk force refresh setelah login
+        localStorage.setItem('forceRefreshAfterLogin', 'true');
+        
         // Update auth nav
         this._updateAuthNav();
         

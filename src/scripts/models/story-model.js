@@ -9,25 +9,25 @@ class StoryModel {
       // Coba ambil dari API dulu
       const response = await StoryAPI.getAllStories(options);
       
-      if (!response.error) {
+      if (!response.error && response.listStory) {
         console.log(`Successfully fetched ${response.listStory.length} stories from API`);
         
-        // Sebelum menyimpan, pastikan status favorit dipertahankan
-        const stories = await this._preserveFavoriteStatus(response.listStory);
+        // BARU: Preserve favorite status dari IndexedDB
+        const storiesWithFavorites = await this._preserveFavoriteStatus(response.listStory);
         
-        // Simpan ke IndexedDB jika berhasil
-        await StoryIdb.saveStories(stories);
+        // BARU: SIMPAN SEMUA STORIES KE INDEXEDDB (bukan hanya yang favorit)
+        console.log('Saving all stories to IndexedDB...');
+        await this._syncStoriesWithIndexedDB(storiesWithFavorites);
         
-        // Return response dengan cerita yang sudah diupdate
         return {
           ...response,
-          listStory: stories
+          listStory: storiesWithFavorites
         };
       }
       
-      console.log('Error fetching from API, trying IndexedDB');
+      console.log('Error fetching from API or no stories, trying IndexedDB');
       
-      // Jika gagal, ambil dari IndexedDB
+      // Jika gagal atau tidak ada data, ambil dari IndexedDB
       const stories = await StoryIdb.getAllStories();
       console.log(`Retrieved ${stories.length} stories from IndexedDB`);
       
@@ -47,6 +47,66 @@ class StoryModel {
         error: false,
         message: 'Stories retrieved from cache',
         listStory: stories,
+      };
+    }
+  }
+
+  // BARU: Method untuk sync semua stories dengan IndexedDB
+  async _syncStoriesWithIndexedDB(stories) {
+    try {
+      console.log(`Syncing ${stories.length} stories to IndexedDB`);
+      
+      for (const story of stories) {
+        await StoryIdb.saveStory(story);
+      }
+      
+      console.log('Stories synced successfully to IndexedDB');
+    } catch (error) {
+      console.error('Error syncing stories to IndexedDB:', error);
+    }
+  }
+
+  // BARU: Method untuk clear dan reload data dari API
+  async forceRefreshFromAPI(options = {}) {
+    try {
+      console.log('Force refreshing stories from API...');
+      
+      // Ambil data fresh dari API
+      const response = await StoryAPI.getAllStories(options);
+      
+      if (!response.error && response.listStory) {
+        console.log(`Successfully fetched ${response.listStory.length} fresh stories from API`);
+        
+        // Preserve favorite status
+        const storiesWithFavorites = await this._preserveFavoriteStatus(response.listStory);
+        
+        // Clear existing cache dalam IndexedDB dan save yang baru
+        console.log('Clearing and updating IndexedDB...');
+        
+        // Ambil favorite stories dulu
+        const favoriteStories = await StoryIdb.getFavoriteStories();
+        
+        // Clear all stories
+        await StoryIdb.clearStories();
+        
+        // Sync ulang dengan data baru
+        await this._syncStoriesWithIndexedDB(storiesWithFavorites);
+        
+        return {
+          ...response,
+          listStory: storiesWithFavorites
+        };
+      }
+      
+      return {
+        error: true,
+        message: 'Failed to refresh data from API'
+      };
+    } catch (error) {
+      console.error('Error force refreshing from API:', error);
+      return {
+        error: true,
+        message: 'Error refreshing data from API'
       };
     }
   }
@@ -123,6 +183,14 @@ class StoryModel {
       
       const response = await StoryAPI.addStory(storyData);
       console.log('Add story API response:', response);
+      
+      // BARU: Jika berhasil menambah story, refresh data dari API
+      if (!response.error) {
+        console.log('Story added successfully, refreshing data...');
+        // Set flag untuk refresh di home page
+        localStorage.setItem('refreshAfterAdd', 'true');
+      }
+      
       return response;
     } catch (error) {
       console.error('Error in addStory model:', error);

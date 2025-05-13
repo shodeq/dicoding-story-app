@@ -6,17 +6,42 @@ class HomePresenter {
     this._model = model;
   }
 
-  async loadStories(options = { location: 0 }) {
+  // BARU: Support parameter forceRefresh
+  async loadStories(options = { location: 0, forceRefresh: false }) {
     try {
       console.log('Loading stories with options:', options);
-      const result = await this._model.getAllStories(options);
       
-      if (!result.error) {
-        console.log(`Loaded ${result.listStory.length} stories successfully`);
-        this._view.showStories(result.listStory);
+      let result;
+      
+      // BARU: Handle force refresh dari API
+      if (options.forceRefresh) {
+        console.log('Force refreshing stories from API...');
+        result = await this._model.forceRefreshFromAPI(options);
+        
+        if (!result.error) {
+          console.log(`Force refreshed ${result.listStory.length} stories successfully`);
+          this._view.showStories(result.listStory);
+        } else {
+          console.error('Error force refreshing stories:', result.message);
+          // Fallback ke cache jika force refresh gagal
+          result = await this._model.getAllStories(options);
+          if (!result.error) {
+            this._view.showStories(result.listStory);
+          } else {
+            this._view.showErrorMessage(result.message);
+          }
+        }
       } else {
-        console.error('Error loading stories:', result.message);
-        this._view.showErrorMessage(result.message);
+        // Normal load (cache-first)
+        result = await this._model.getAllStories(options);
+        
+        if (!result.error) {
+          console.log(`Loaded ${result.listStory.length} stories successfully`);
+          this._view.showStories(result.listStory);
+        } else {
+          console.error('Error loading stories:', result.message);
+          this._view.showErrorMessage(result.message);
+        }
       }
     } catch (error) {
       console.error('Unexpected error in loadStories:', error);
@@ -78,6 +103,17 @@ class HomePresenter {
   
   async subscribeNotification(subscription) {
     try {
+      console.log('Subscribing notification with subscription:', subscription);
+      
+      // Validasi subscription
+      if (!subscription || !subscription.endpoint) {
+        console.error('Invalid subscription object');
+        return {
+          error: true,
+          message: 'Subscription tidak valid'
+        };
+      }
+      
       return await StoryAPI.subscribeNotification(subscription);
     } catch (error) {
       console.error('Error subscribing to notification:', error);
@@ -90,6 +126,24 @@ class HomePresenter {
   
   async unsubscribeNotification(endpoint) {
     try {
+      // Validasi endpoint
+      if (!endpoint) {
+        console.error('Invalid endpoint');
+        return {
+          error: true,
+          message: 'Endpoint tidak valid'
+        };
+      }
+      
+      console.log('Unsubscribing notification for endpoint:', endpoint);
+      
+      // Kirim request ke server untuk hapus langganan
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return { error: true, message: 'User not logged in' };
+      }
+      
+      // Hubungi API untuk unsubscribe endpoint ini
       return await StoryAPI.unsubscribeNotification(endpoint);
     } catch (error) {
       console.error('Error unsubscribing from notification:', error);

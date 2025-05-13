@@ -25,10 +25,13 @@ export default class HomePage {
           
           <div class="stories-actions">
             <div class="action-group">
+              <!-- Tambah tombol refresh -->
+              <button id="refresh-stories" class="btn btn-secondary btn-with-icon">
+                <i class="fas fa-sync-alt"></i> Refresh Data
+              </button>
               <button id="notification-button" class="btn btn-accent btn-with-icon">
                 <i class="fas fa-bell"></i> Aktifkan Notifikasi
               </button>
-              
               <a href="#/favorite" class="btn btn-primary btn-with-icon">
                 <i class="fas fa-star"></i> Lihat Favorit
               </a>
@@ -63,11 +66,30 @@ export default class HomePage {
   async afterRender() {
     console.log('HomePage afterRender()');
     this._initMap();
-    await this._presenter.loadStories({ location: 0 });
+    
+    // Cek apakah perlu force refresh setelah login
+    const forceRefreshAfterLogin = localStorage.getItem('forceRefreshAfterLogin');
+    const refreshAfterAdd = localStorage.getItem('refreshAfterAdd');
+    
+    if (forceRefreshAfterLogin) {
+      console.log('Force refreshing after login');
+      localStorage.removeItem('forceRefreshAfterLogin');
+      await this._presenter.loadStories({ location: 0, forceRefresh: true });
+    } else if (refreshAfterAdd) {
+      console.log('Refreshing after adding story');
+      localStorage.removeItem('refreshAfterAdd');
+      await this._presenter.loadStories({ location: 0, forceRefresh: true });
+    } else {
+      await this._presenter.loadStories({ location: 0 });
+    }
+    
     this._initNotificationButton();
     this._initViewOptions();
     this._checkOnlineStatus();
     this._initStoriesList();
+    
+    // Initialize refresh button
+    this._initRefreshButton();
     
     // Listener untuk status online/offline
     window.addEventListener('online', () => {
@@ -79,6 +101,77 @@ export default class HomePage {
     window.addEventListener('offline', () => {
       this._checkOnlineStatus();
     });
+  }
+
+  // Method untuk handle refresh button
+  _initRefreshButton() {
+    const refreshButton = document.getElementById('refresh-stories');
+    
+    if (!refreshButton) {
+      console.error('refresh-stories button not found');
+      return;
+    }
+    
+    refreshButton.addEventListener('click', async () => {
+      console.log('Refresh button clicked');
+      
+      // Show loading state
+      const originalText = refreshButton.innerHTML;
+      refreshButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memuat...';
+      refreshButton.disabled = true;
+      
+      try {
+        // Force refresh from API
+        const currentView = document.getElementById('view-with-location').classList.contains('active') ? 1 : 0;
+        await this._presenter.loadStories({ location: currentView, forceRefresh: true });
+        
+        // Reset button
+        refreshButton.innerHTML = originalText;
+        refreshButton.disabled = false;
+        
+        // Show success message
+        this._showMessage('Data berhasil diperbarui');
+      } catch (error) {
+        console.error('Error refreshing stories:', error);
+        
+        // Reset button
+        refreshButton.innerHTML = originalText;
+        refreshButton.disabled = false;
+        
+        // Show error message
+        this._showMessage('Gagal memperbarui data. Silakan coba lagi.', 'error');
+      }
+    });
+  }
+
+  // Method untuk show toast message
+  _showMessage(message, type = 'success') {
+    // Cek jika toast sudah ada, hapus dahulu
+    const existingToast = document.querySelector('.toast-message');
+    if (existingToast) {
+      document.body.removeChild(existingToast);
+    }
+    
+    // Buat elemen toast
+    const toast = document.createElement('div');
+    toast.className = `toast-message ${type === 'error' ? 'error' : ''} show`;
+    toast.innerHTML = `
+      <div class="toast-content">
+        <i class="fas ${type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'}"></i>
+        <span>${message}</span>
+      </div>
+    `;
+    document.body.appendChild(toast);
+    
+    // Auto hide after 3 seconds
+    setTimeout(() => {
+      toast.classList.add('hide');
+      setTimeout(() => {
+        if (toast.parentNode) {
+          document.body.removeChild(toast);
+        }
+      }, 300);
+    }, 3000);
   }
 
   showStories(stories) {
@@ -205,72 +298,119 @@ export default class HomePage {
     
     if (!NotificationHelper.isNotificationSupported()) {
       console.log('Notifications not supported');
-      notificationButton.textContent = 'Notifikasi tidak didukung';
+      notificationButton.innerHTML = '<i class="fas fa-bell-slash"></i> Notifikasi Tidak Didukung';
       notificationButton.disabled = true;
       return;
     }
     
     notificationButton.addEventListener('click', async () => {
       try {
-        console.log('Notification button clicked, requesting permission');
-        const isPermissionGranted = await this._notificationHelper.requestPermission();
+        // Cek apakah sudah berlangganan
+        const subscription = await this._notificationHelper.getSubscription();
         
-        if (isPermissionGranted) {
+        if (subscription) {
+          // Jika sudah berlangganan, lakukan unsubscribe
+          console.log('Unsubscribing from notifications');
+          
+          // Show loading state
+          notificationButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menonaktifkan...';
+          notificationButton.disabled = true;
+          
           try {
-            console.log('Permission granted, subscribing to push');
-            // Get subscription - menggunakan fallback di notification.js
-            const subscription = await this._notificationHelper.subscribeToPush();
+            // Hapus langganan dari push manager
+            await subscription.unsubscribe();
             
-            // Send to server
-            const response = await this._presenter.subscribeNotification(subscription);
-            
-            if (!response.error) {
-              console.log('Successfully subscribed to notifications on server');
-              notificationButton.innerHTML = '<i class="fas fa-bell"></i> Notifikasi Aktif';
-              notificationButton.disabled = true;
-              
-              // Tampilkan test notification
-              this._notificationHelper.showNotification(
-                'Notifikasi Aktif',
-                {
-                  body: 'Anda akan menerima pemberitahuan saat ada cerita baru',
-                  icon: '/favicon.png'
-                }
-              );
-            } else {
-              // Fallback jika server error
-              console.error('Server error:', response.message);
-              
-              // Kita masih bisa menampilkan notification meskipun push gagal
-              this._notificationHelper.showNotification(
-                'Notifikasi Aktif',
-                {
-                  body: 'Anda akan menerima pemberitahuan saat ada cerita baru',
-                  icon: '/favicon.png'
-                }
-              );
-              
-              notificationButton.innerHTML = '<i class="fas fa-bell"></i> Notifikasi Aktif';
-              notificationButton.disabled = true;
+            // Hapus langganan dari server jika user login
+            const token = localStorage.getItem('token');
+            if (token) {
+              await this._presenter.unsubscribeNotification(subscription.endpoint);
             }
-          } catch (error) {
-            console.error('Error subscribing to notification:', error);
-            // Kita masih bisa menampilkan notification meskipun push gagal
-            new Notification('Notifikasi Aktif', {
-              body: 'Anda akan menerima pemberitahuan saat ada cerita baru',
-              icon: '/favicon.png'
-            });
             
-            notificationButton.innerHTML = '<i class="fas fa-bell"></i> Notifikasi Aktif';
-            notificationButton.disabled = true;
+            // Update UI
+            notificationButton.innerHTML = '<i class="fas fa-bell-slash"></i> Aktifkan Notifikasi';
+            notificationButton.disabled = false;
+            
+            // Tampilkan pesan sukses
+            this._showMessage('Notifikasi berhasil dinonaktifkan');
+          } catch (error) {
+            console.error('Error unsubscribing from notification:', error);
+            notificationButton.innerHTML = '<i class="fas fa-bell"></i> Nonaktifkan Notifikasi';
+            notificationButton.disabled = false;
+            this._showMessage('Gagal menonaktifkan notifikasi', 'error');
           }
         } else {
-          console.log('Notification permission denied');
-          alert('Mohon berikan izin notifikasi untuk mengaktifkan fitur ini.');
+          // Jika belum berlangganan, lakukan subscribe
+          console.log('Notification button clicked, requesting permission');
+          
+          // Show loading state
+          notificationButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mengaktifkan...';
+          notificationButton.disabled = true;
+          
+          const isPermissionGranted = await this._notificationHelper.requestPermission();
+          
+          if (isPermissionGranted) {
+            try {
+              console.log('Permission granted, subscribing to push');
+              // Get subscription
+              const subscription = await this._notificationHelper.subscribeToPush();
+              
+              // Check if user is logged in before sending to server
+              const token = localStorage.getItem('token');
+              
+              if (token) {
+                // Send to server
+                const response = await this._presenter.subscribeNotification(subscription);
+                
+                if (!response.error) {
+                  console.log('Successfully subscribed to notifications on server');
+                  notificationButton.innerHTML = '<i class="fas fa-bell"></i> Nonaktifkan Notifikasi';
+                  notificationButton.disabled = false;
+                  
+                  this._showNotificationSuccessModal();
+                } else {
+                  console.error('Server error:', response.message);
+                  this._showNotificationErrorModal(response.message);
+                  notificationButton.innerHTML = '<i class="fas fa-bell-slash"></i> Aktifkan Notifikasi';
+                  notificationButton.disabled = false;
+                }
+              } else {
+                // Not logged in, but still show notification works locally
+                notificationButton.innerHTML = '<i class="fas fa-bell"></i> Nonaktifkan Notifikasi';
+                notificationButton.disabled = false;
+                
+                // Show notification
+                this._notificationHelper.showNotification(
+                  'Notifikasi Aktif',
+                  {
+                    body: 'Anda akan menerima notifikasi lokal. Login untuk notifikasi server.',
+                    icon: '/src/public/icons/icon-192x192.png',
+                    badge: '/src/public/icons/icon-192x192.png'
+                  }
+                );
+                
+                this._showNotificationPartialModal();
+              }
+            } catch (error) {
+              console.error('Error subscribing to notification:', error);
+              notificationButton.innerHTML = '<i class="fas fa-bell-slash"></i> Aktifkan Notifikasi';
+              notificationButton.disabled = false;
+              
+              this._showNotificationErrorModal('Gagal mengaktifkan notifikasi. Silakan coba lagi.');
+            }
+          } else {
+            console.log('Notification permission denied');
+            notificationButton.innerHTML = '<i class="fas fa-bell-slash"></i> Aktifkan Notifikasi';
+            notificationButton.disabled = false;
+            
+            this._showPermissionDeniedModal();
+          }
         }
       } catch (error) {
-        console.error('Error activating notification:', error);
-        alert('Gagal mengaktifkan notifikasi. Silakan coba lagi.');
+        console.error('Error toggling notification:', error);
+        notificationButton.innerHTML = '<i class="fas fa-bell-slash"></i> Aktifkan Notifikasi';
+        notificationButton.disabled = false;
+        
+        this._showNotificationErrorModal('Terjadi kesalahan saat mengaktifkan/menonaktifkan notifikasi.');
       }
     });
     
@@ -296,13 +436,172 @@ export default class HomePage {
       
       if (subscription) {
         console.log('User is already subscribed to notifications');
-        notificationButton.innerHTML = '<i class="fas fa-bell"></i> Notifikasi Aktif';
-        notificationButton.disabled = true;
+        notificationButton.innerHTML = '<i class="fas fa-bell"></i> Nonaktifkan Notifikasi';
+        // Jangan nonaktifkan tombol
+        notificationButton.disabled = false;
       } else {
         console.log('User is not subscribed to notifications');
+        notificationButton.innerHTML = '<i class="fas fa-bell-slash"></i> Aktifkan Notifikasi';
       }
     } catch (error) {
       console.error('Error checking notification status:', error);
+    }
+  }
+  
+  // Modal sukses untuk notification
+  _showNotificationSuccessModal() {
+    const modal = this._createModal(
+      'Notifikasi Berhasil Diaktifkan',
+      'Anda akan menerima notifikasi saat ada cerita baru. Notifikasi telah tersinkron dengan server.',
+      [
+        {
+          text: 'OK',
+          class: 'btn btn-primary btn-with-icon',
+          action: () => {
+            this._closeModal(modal);
+            // Show demo notification
+            this._notificationHelper.showNotification(
+              'Notifikasi Demo',
+              {
+                body: 'Ini adalah contoh notifikasi dari Dicoding Story',
+                icon: '/src/public/icons/icon-192x192.png',
+                badge: '/src/public/icons/icon-192x192.png'
+              }
+            );
+          }
+        }
+      ]
+    );
+    
+    document.body.appendChild(modal);
+  }
+
+  // Modal untuk notifikasi partial (tanpa login)
+  _showNotificationPartialModal() {
+    const modal = this._createModal(
+      'Notifikasi Lokal Aktif',
+      'Notifikasi berhasil diaktifkan untuk sesi ini. Untuk notifikasi server yang persisten, silakan login terlebih dahulu.',
+      [
+        {
+          text: 'Login Sekarang',
+          class: 'btn btn-primary btn-with-icon',
+          action: () => {
+            window.location.hash = '#/login';
+            this._closeModal(modal);
+          }
+        },
+        {
+          text: 'Nanti Saja',
+          class: 'btn btn-secondary',
+          action: () => this._closeModal(modal)
+        }
+      ]
+    );
+    
+    document.body.appendChild(modal);
+  }
+
+  // Modal untuk permission denied
+  _showPermissionDeniedModal() {
+    const modal = this._createModal(
+      'Izin Notifikasi Ditolak',
+      'Untuk mengaktifkan notifikasi, silakan:' +
+      '<br>1. Klik ikon gembok di address bar' +
+      '<br>2. Pilih "Izinkan" untuk notifikasi' +
+      '<br>3. Refresh halaman dan coba lagi',
+      [
+        {
+          text: 'Refresh Halaman',
+          class: 'btn btn-primary btn-with-icon',
+          action: () => {
+            window.location.reload();
+          }
+        },
+        {
+          text: 'OK',
+          class: 'btn btn-secondary',
+          action: () => this._closeModal(modal)
+        }
+      ]
+    );
+    
+    document.body.appendChild(modal);
+  }
+
+  // Modal untuk error notification
+  _showNotificationErrorModal(message) {
+    const modal = this._createModal(
+      'Gagal Mengaktifkan Notifikasi',
+      message || 'Terjadi kesalahan saat mengaktifkan notifikasi.',
+      [
+        {
+          text: 'Coba Lagi',
+          class: 'btn btn-secondary btn-with-icon',
+          action: () => {
+            this._closeModal(modal);
+            // Trigger notification button click again
+            setTimeout(() => {
+              document.getElementById('notification-button').click();
+            }, 100);
+          }
+        },
+        {
+          text: 'OK',
+          class: 'btn btn-primary',
+          action: () => this._closeModal(modal)
+        }
+      ]
+    );
+    
+    document.body.appendChild(modal);
+  }
+
+  // Helper untuk create modal
+  _createModal(title, message, buttons) {
+    const modalHtml = `
+      <div class="modal-overlay" onclick="this.style.opacity='0'; setTimeout(() => document.body.removeChild(this.parentElement), 300)">
+        <div class="modal-container" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <h2 class="modal-title">${title}</h2>
+            <button class="modal-close" onclick="document.body.removeChild(this.closest('.modal-overlay').parentElement)">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p class="modal-message">${message}</p>
+          </div>
+          <div class="modal-footer">
+            ${buttons.map(btn => 
+              `<button class="${btn.class}" data-action="${btn.text}">
+                ${btn.text}
+              </button>`
+            ).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+    
+    const modal = document.createElement('div');
+    modal.innerHTML = modalHtml;
+    
+    // Add event listeners
+    buttons.forEach(btn => {
+      const button = modal.querySelector(`[data-action="${btn.text}"]`);
+      button.addEventListener('click', btn.action);
+    });
+    
+    return modal;
+  }
+
+  // Helper untuk close modal
+  _closeModal(modal) {
+    if (modal.parentNode) {
+      modal.querySelector('.modal-overlay').style.opacity = '0';
+      setTimeout(() => {
+        if (modal.parentNode) {
+          document.body.removeChild(modal);
+        }
+      }, 300);
     }
   }
   
