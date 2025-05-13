@@ -1,38 +1,107 @@
-// Minimal Service Worker untuk submission
-self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installed');
-  self.skipWaiting();
-});
+import { precacheAndRoute } from 'workbox-precaching';
+import { registerRoute } from 'workbox-routing';
+import { StaleWhileRevalidate, NetworkFirst, CacheFirst } from 'workbox-strategies';
+import { ExpirationPlugin } from 'workbox-expiration';
+import { clientsClaim } from 'workbox-core';
 
-self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activated');
-  event.waitUntil(self.clients.claim());
-});
+// Meng-claim clients dan skip waiting on install
+self.skipWaiting();
+clientsClaim();
 
-// Simple static cache strategy
-const CACHE_NAME = 'story-app-v1';
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/app.webmanifest',
-  '/favicon.png',
-];
+// Precache - untuk App Shell
+precacheAndRoute(self.__WB_MANIFEST || []);
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(urlsToCache);
-    })
-  );
-});
+// Cache Google Fonts
+registerRoute(
+  ({ url }) => url.origin === 'https://fonts.googleapis.com' || 
+               url.origin === 'https://fonts.gstatic.com',
+  new StaleWhileRevalidate({
+    cacheName: 'google-fonts',
+  })
+);
 
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    })
-  );
-});
+// Cache untuk Font Awesome
+registerRoute(
+  ({ url }) => url.origin === 'https://cdnjs.cloudflare.com' && 
+               url.pathname.startsWith('/ajax/libs/font-awesome/'),
+  new CacheFirst({
+    cacheName: 'font-awesome',
+    plugins: [
+      new ExpirationPlugin({
+        maxAgeSeconds: 60 * 60 * 24 * 30, // 30 hari
+      }),
+    ],
+  })
+);
+
+// Cache untuk Leaflet
+registerRoute(
+  ({ url }) => url.origin === 'https://unpkg.com' && 
+               url.pathname.startsWith('/leaflet'),
+  new CacheFirst({
+    cacheName: 'leaflet-js',
+    plugins: [
+      new ExpirationPlugin({
+        maxAgeSeconds: 60 * 60 * 24 * 30, // 30 hari
+      }),
+    ],
+  })
+);
+
+// Cache untuk Leaflet Tiles
+registerRoute(
+  ({ url }) => url.href.includes('tile.openstreetmap.org'),
+  new CacheFirst({
+    cacheName: 'map-tiles',
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 500, // Maksimal 500 tile di cache
+        maxAgeSeconds: 60 * 60 * 24 * 30, // 30 hari
+      }),
+    ],
+  })
+);
+
+// Cache untuk Image
+registerRoute(
+  ({ request }) => request.destination === 'image',
+  new CacheFirst({
+    cacheName: 'images',
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 60,
+        maxAgeSeconds: 60 * 60 * 24 * 30, // 30 hari
+      }),
+    ],
+  })
+);
+
+// API Cache - Network First dengan fallback ke cache
+registerRoute(
+  ({ url }) => url.href.includes('story-api.dicoding.dev'),
+  new NetworkFirst({
+    cacheName: 'api-responses',
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 100,
+        maxAgeSeconds: 60 * 60 * 24, // 1 hari
+      }),
+    ],
+  })
+);
+
+// Fallback untuk navigasi - Untuk SPA
+registerRoute(
+  ({ request }) => request.mode === 'navigate',
+  new NetworkFirst({
+    cacheName: 'navigations',
+    plugins: [
+      new ExpirationPlugin({
+        maxEntries: 50,
+      }),
+    ],
+  })
+);
 
 // Event untuk push notification
 self.addEventListener('push', (event) => {

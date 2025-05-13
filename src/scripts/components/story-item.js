@@ -10,9 +10,10 @@ class StoryItem extends HTMLElement {
     this.render();
   }
 
-
   render() {
     if (!this._story) return;
+
+    console.log(`Rendering story ${this._story.id}, favorited: ${this._story.favorited}`);
 
     this.innerHTML = `
       <article class="story-item card">
@@ -39,10 +40,65 @@ class StoryItem extends HTMLElement {
             <a href="#/story/${this._story.id}" class="btn btn-secondary btn-with-icon">
               <i class="fas fa-book-open"></i> Baca Selengkapnya
             </a>
+            
+            <button class="btn favorite-button ${this._story.favorited ? 'favorited' : ''}" data-id="${this._story.id}">
+              <i class="fas ${this._story.favorited ? 'fa-star' : 'fa-star-o'}"></i>
+            </button>
           </div>
         </div>
       </article>
     `;
+    
+    // Add event listener to favorite button
+    const favoriteButton = this.querySelector('.favorite-button');
+    if (favoriteButton) {
+      favoriteButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        console.log(`Favorite button clicked for story ${this._story.id}`);
+        
+        // Create a custom event for favorite
+        const favoriteEvent = new CustomEvent('favorite-toggle', {
+          detail: {
+            id: this._story.id,
+            favorited: this._story.favorited || false
+          },
+          bubbles: true
+        });
+        
+        // Dispatch the event
+        this.dispatchEvent(favoriteEvent);
+        
+        // Toggle favorited state in UI (optimistic update)
+        this._toggleFavoriteState(favoriteButton);
+      });
+    }
+  }
+  
+  _toggleFavoriteState(button) {
+    if (!button) return;
+    
+    // Toggle state in the button
+    if (button.classList.contains('favorited')) {
+      console.log(`Un-favoriting story ${this._story.id} in UI`);
+      button.classList.remove('favorited');
+      const icon = button.querySelector('i');
+      if (icon) {
+        icon.classList.replace('fa-star', 'fa-star-o');
+      }
+      // Update story object
+      this._story.favorited = false;
+    } else {
+      console.log(`Favoriting story ${this._story.id} in UI`);
+      button.classList.add('favorited');
+      const icon = button.querySelector('i');
+      if (icon) {
+        icon.classList.replace('fa-star-o', 'fa-star');
+      }
+      // Update story object
+      this._story.favorited = true;
+    }
   }
 }
 

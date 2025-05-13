@@ -15,6 +15,12 @@ import 'regenerator-runtime';
 // Menambahkan CSS untuk auth-nav dan offline message
 const style = document.createElement('style');
 style.textContent = `
+  .action-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
   .auth-nav-container {
     display: flex;
     flex-direction: column;
@@ -97,6 +103,10 @@ style.textContent = `
   .favorite-button.favorited {
     background-color: var(--accent-color);
     color: var(--dark-color);
+  }
+  
+  .favorite-button i {
+    font-size: 1.2rem;
   }
   
   @media screen and (min-width: 1000px) {

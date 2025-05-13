@@ -1,0 +1,71 @@
+.favorite-page {
+  animation: fadeIn 0.5s ease forwards;
+}
+
+.favorite-page .page-title {
+  color: var(--dark-color);
+}
+
+.favorite-actions {
+  margin-bottom: 30px;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.empty-state {
+  background-color: var(--light-color);
+  padding: 60px 30px;
+  border: var(--border-width) solid var(--dark-color);
+  text-align: center;
+  margin: 30px 0;
+  font-weight: bold;
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--dark-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.empty-state .empty-icon {
+  font-size: 64px;
+  color: var(--accent-color);
+  margin-bottom: 20px;
+}
+
+.empty-state p {
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+/* Animation for removing from favorites */
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+
+.story-item.removing {
+  animation: fadeOut 0.3s ease forwards;
+}
+
+/* Media Queries */
+@media screen and (max-width: 768px) {
+  .favorite-actions {
+    flex-direction: column;
+  }
+  
+  .empty-state {
+    padding: 40px 20px;
+  }
+  
+  .empty-state .empty-icon {
+    font-size: 48px;
+  }
+}

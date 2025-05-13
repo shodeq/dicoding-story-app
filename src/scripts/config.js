@@ -1,6 +1,5 @@
 const CONFIG = {
   BASE_URL: 'https://story-api.dicoding.dev/v1',
-  // MAPBOX_API_KEY: 'YOUR_MAPBOX_API_KEY', // Ganti dengan API key Anda di STUDENT.txt
   STORAGE_KEY: 'story_app_data',
   DEFAULT_LANGUAGE: 'id',
   // Untuk notifikasi push
