@@ -1,3 +1,4 @@
+// src/scripts/utils/notification.js
 import CONFIG from '../config';
 import StoryAPI from '../data/api';
 
@@ -6,7 +7,7 @@ import StoryAPI from '../data/api';
  */
 class NotificationHelper {
   constructor() {
-    this._publicKey = CONFIG.PUSH_MSG_VAPID_PUBLIC_KEY || 'BDsFqizPr3HtfcANJUG7vG8s_M-i1wjUCQrFCnHQgdV6c-DqsEL0u62xAqd0DQq4XNZfPTtFo9RgVgWgJHx_AXA';
+    this._publicKey = CONFIG.PUSH_MSG_VAPID_PUBLIC_KEY;
   }
   
   /**
@@ -67,7 +68,8 @@ class NotificationHelper {
   
   /**
    * Berlangganan Push Notification
-   * @returns {Promise<PushSubscription>} Promise yang berisi data langganan
+   * PERBAIKAN: Kembalikan objek hibrida dengan keys yang siap digunakan dan method unsubscribe
+   * @returns {Promise<Object>} Promise yang berisi data langganan dalam format yang siap digunakan
    */
   async subscribeToPush() {
     try {
@@ -88,29 +90,16 @@ class NotificationHelper {
       console.log('Service worker is ready:', registration);
       
       if (!registration || !registration.pushManager) {
-        console.log('Push manager not available, using fallback subscription');
-        
-        // Fallback subscription sebagai solusi, pastikan memiliki struktur lengkap
-        return {
-          endpoint: 'https://fcm.googleapis.com/fcm/send/' + Date.now(),
-          keys: {
-            p256dh: 'dummy-p256dh-key-' + Date.now(),
-            auth: 'dummy-auth-key-' + Date.now(),
-          },
-          toJSON() {
-            return {
-              endpoint: this.endpoint,
-              keys: this.keys
-            };
-          }
-        };
+        throw new Error('Push manager not available');
       }
       
-      // Options untuk subscribe
+      // Pastikan applicationServerKey adalah valid
       const subscribeOptions = {
         userVisibleOnly: true,
         applicationServerKey: this._urlBase64ToUint8Array(this._publicKey)
       };
+      
+      console.log('Subscribe options:', subscribeOptions);
       
       try {
         console.log('Attempting to get subscription...');
@@ -120,60 +109,78 @@ class NotificationHelper {
         
         if (existingSubscription) {
           console.log('Found existing subscription:', existingSubscription);
-          return existingSubscription;
+          
+          // Dapatkan JSON untuk verifikasi
+          const subscriptionJson = existingSubscription.toJSON();
+          
+          // Verifikasi subscription memiliki keys yang diperlukan
+          if (!subscriptionJson.keys || !subscriptionJson.keys.p256dh || !subscriptionJson.keys.auth) {
+            console.warn('Existing subscription tidak memiliki keys lengkap, unsubscribe dan buat baru');
+            await existingSubscription.unsubscribe();
+            // Lanjutkan untuk membuat subscription baru di bawah
+          } else {
+            // PERBAIKAN: Buat objek hibrida dengan data dari JSON dan objek asli
+            return this._createHybridSubscriptionObject(existingSubscription);
+          }
         }
         
-        console.log('No existing subscription found, creating new subscription...');
+        console.log('No existing subscription found or need new one, creating new subscription...');
         
-        // Subscribe
-        const subscription = await registration.pushManager.subscribe(subscribeOptions);
+        // Subscribe baru
+        const newSubscription = await registration.pushManager.subscribe(subscribeOptions);
         
-        console.log('Created new push subscription:', subscription);
+        console.log('Created new push subscription:', newSubscription);
         
-        // Verifikasi subscription
-        if (!subscription || !subscription.endpoint) {
-          throw new Error('Gagal mendapatkan subscription yang valid');
-        }
+        // PERBAIKAN: Buat objek hibrida dengan data dari JSON dan objek asli
+        return this._createHybridSubscriptionObject(newSubscription);
         
-        return subscription;
       } catch (subscribeError) {
         console.error('Error subscribing to push:', subscribeError);
-        
-        // Jika gagal, buat subscription dummy yang valid dengan struktur lengkap
-        console.log('Creating fallback subscription');
-        
-        return {
-          endpoint: 'https://dummy-endpoint.com/subscription/' + Date.now(),
-          keys: {
-            p256dh: 'dummy-p256dh-key-' + Date.now(),
-            auth: 'dummy-auth-key-' + Date.now()
-          },
-          toJSON() {
-            return {
-              endpoint: this.endpoint,
-              keys: this.keys
-            };
-          }
-        };
+        throw subscribeError;
       }
     } catch (error) {
       console.error('Error in subscribeToPush:', error);
-      
-      // Pastikan kita mengembalikan objek dengan struktur yang valid
-      return {
-        endpoint: 'https://error-fallback.com/subscription/' + Date.now(),
-        keys: {
-          p256dh: 'error-p256dh-key-' + Date.now(),
-          auth: 'error-auth-key-' + Date.now()
-        },
-        toJSON() {
-          return {
-            endpoint: this.endpoint,
-            keys: this.keys
-          };
-        }
-      };
+      throw error;
     }
+  }
+  
+  /**
+   * PERBAIKAN: Membuat objek hibrida yang menggabungkan PushSubscription asli dan datanya
+   * Ini memberikan data yang siap digunakan dan juga menyediakan method unsubscribe()
+   * @param {PushSubscription} subscription - Objek PushSubscription asli
+   * @returns {Object} Objek hibrida dengan data dan metode unsubscribe
+   * @private
+   */
+  _createHybridSubscriptionObject(subscription) {
+    if (!subscription) return null;
+    
+    // Ambil data dari toJSON()
+    const subscriptionData = subscription.toJSON();
+    
+    // Buat objek baru dengan properti dari JSON
+    const hybridSubscription = {
+      endpoint: subscriptionData.endpoint,
+      expirationTime: subscriptionData.expirationTime,
+      keys: subscriptionData.keys, // Keys tersedia langsung di objek
+      
+      // Tambahkan method unsubscribe yang memanggil method asli
+      unsubscribe: async function() {
+        return await subscription.unsubscribe();
+      },
+      
+      // Method toJSON untuk kompatibilitas
+      toJSON: function() {
+        return subscriptionData;
+      },
+      
+      // Referensi ke objek asli (opsional)
+      _originalSubscription: subscription
+    };
+    
+    // Verifikasi dan log untuk debugging
+    console.log('Created hybrid subscription object with keys:', hybridSubscription.keys);
+    
+    return hybridSubscription;
   }
   
   /**
@@ -261,7 +268,13 @@ class NotificationHelper {
         
         const subscription = await registration.pushManager.getSubscription();
         console.log('Current subscription status:', subscription ? 'Subscribed' : 'Not subscribed');
-        return subscription;
+        
+        if (subscription) {
+          // PERBAIKAN: Kembalikan objek hibrida untuk kompatibilitas
+          return this._createHybridSubscriptionObject(subscription);
+        }
+        
+        return null;
       } catch (regError) {
         console.error('Error accessing service worker registration:', regError);
         return null;
@@ -349,12 +362,14 @@ class NotificationHelper {
           console.log('Push Subscription:', subscription ? 'Active' : 'None');
           
           if (subscription) {
-            console.log('Subscription Endpoint:', subscription.endpoint);
-            console.log('Subscription Keys Present:', !!subscription.keys);
+            // Gunakan toJSON hanya untuk debugging
+            const subscriptionJson = subscription.toJSON();
+            console.log('Subscription Endpoint:', subscriptionJson.endpoint);
+            console.log('Subscription Keys Present:', !!subscriptionJson.keys);
             
-            if (subscription.keys) {
-              console.log('Keys include p256dh:', 'p256dh' in subscription.keys);
-              console.log('Keys include auth:', 'auth' in subscription.keys);
+            if (subscriptionJson.keys) {
+              console.log('Keys include p256dh:', 'p256dh' in subscriptionJson.keys);
+              console.log('Keys include auth:', 'auth' in subscriptionJson.keys);
             }
           }
         } else {

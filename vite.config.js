@@ -1,9 +1,15 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { resolve } from 'path';
 
 export default defineConfig({
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+      },
+    },
   },
   plugins: [
     VitePWA({
@@ -58,7 +64,7 @@ export default defineConfig({
             src: '/icons/icon-384x384.png',
             sizes: '384x384',
             type: 'image/png',
-            purpose: 'any'
+purpose: 'any'
           },
           {
             src: '/icons/icon-512x512.png',
@@ -153,4 +159,6 @@ export default defineConfig({
       },
     }),
   ],
+  // PERBAIKAN: Pastikan assets di direktori public disalin dengan benar
+  publicDir: 'src/public',
 });

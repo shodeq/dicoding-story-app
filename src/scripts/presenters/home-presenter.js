@@ -1,3 +1,4 @@
+// src/scripts/presenters/home-presenter.js
 import StoryAPI from '../data/api';
 
 class HomePresenter {
@@ -6,14 +7,14 @@ class HomePresenter {
     this._model = model;
   }
 
-  // BARU: Support parameter forceRefresh
+  // Support parameter forceRefresh
   async loadStories(options = { location: 0, forceRefresh: false }) {
     try {
       console.log('Loading stories with options:', options);
       
       let result;
       
-      // BARU: Handle force refresh dari API
+      // Handle force refresh dari API
       if (options.forceRefresh) {
         console.log('Force refreshing stories from API...');
         result = await this._model.forceRefreshFromAPI(options);
@@ -46,6 +47,34 @@ class HomePresenter {
     } catch (error) {
       console.error('Unexpected error in loadStories:', error);
       this._view.showErrorMessage('Gagal memuat cerita. Silakan coba lagi.');
+    }
+  }
+  
+  // TAMBAHAN: Method untuk clear IndexedDB
+  async clearIndexedDB() {
+    try {
+      console.log('Clearing IndexedDB');
+      return await this._model.clearIndexedDBStorage();
+    } catch (error) {
+      console.error('Error clearing IndexedDB:', error);
+      return {
+        error: true,
+        message: 'Error clearing IndexedDB'
+      };
+    }
+  }
+  
+  // TAMBAHAN: Method untuk update IndexedDB
+  async updateIndexedDB() {
+    try {
+      console.log('Updating IndexedDB');
+      return await this._model.updateIndexedDBStorage();
+    } catch (error) {
+      console.error('Error updating IndexedDB:', error);
+      return {
+        error: true,
+        message: 'Error updating IndexedDB'
+      };
     }
   }
   
@@ -111,6 +140,15 @@ class HomePresenter {
         return {
           error: true,
           message: 'Subscription tidak valid'
+        };
+      }
+      
+      // PERBAIKAN: Validasi keys lebih detail
+      if (!subscription.keys || !subscription.keys.p256dh || !subscription.keys.auth) {
+        console.error('Invalid keys in subscription object');
+        return {
+          error: true,
+          message: 'Keys pada subscription tidak valid'
         };
       }
       

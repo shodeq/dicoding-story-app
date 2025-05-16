@@ -1,3 +1,4 @@
+// src/scripts/pages/home/home-page.js
 import StoryModel from '../../models/story-model';
 import HomePresenter from '../../presenters/home-presenter';
 import NotificationHelper from '../../utils/notification';
@@ -25,7 +26,7 @@ export default class HomePage {
           
           <div class="stories-actions">
             <div class="action-group">
-              <!-- Tambah tombol refresh -->
+              <!-- Tombol refresh -->
               <button id="refresh-stories" class="btn btn-secondary btn-with-icon">
                 <i class="fas fa-sync-alt"></i> Refresh Data
               </button>
@@ -44,6 +45,20 @@ export default class HomePage {
               <button id="view-with-location" class="btn btn-secondary btn-with-icon">
                 <i class="fas fa-map-marker-alt"></i> Dengan Lokasi
               </button>
+              <!-- TAMBAHAN: Tambahkan menu dropdown untuk IndexedDB -->
+              <div class="dropdown">
+                <button id="idb-options" class="btn btn-secondary btn-with-icon">
+                  <i class="fas fa-database"></i> Data Lokal <i class="fas fa-caret-down"></i>
+                </button>
+                <div class="dropdown-content">
+                  <button id="clear-idb" class="dropdown-item">
+                    <i class="fas fa-trash"></i> Hapus Data Lokal
+                  </button>
+                  <button id="refresh-idb" class="dropdown-item">
+                    <i class="fas fa-sync"></i> Perbarui Data Lokal
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
           
@@ -91,6 +106,9 @@ export default class HomePage {
     // Initialize refresh button
     this._initRefreshButton();
     
+    // TAMBAHAN: Initialize IndexedDB options
+    this._initIndexedDBOptions();
+    
     // Listener untuk status online/offline
     window.addEventListener('online', () => {
       this._checkOnlineStatus();
@@ -101,6 +119,71 @@ export default class HomePage {
     window.addEventListener('offline', () => {
       this._checkOnlineStatus();
     });
+  }
+
+  // TAMBAHAN: Method untuk handle IndexedDB options
+  _initIndexedDBOptions() {
+    const clearIdbButton = document.getElementById('clear-idb');
+    const refreshIdbButton = document.getElementById('refresh-idb');
+    
+    if (clearIdbButton) {
+      clearIdbButton.addEventListener('click', async () => {
+        // Konfirmasi penghapusan
+        if (confirm('Apakah Anda yakin ingin menghapus semua data lokal? Ini akan menghapus data yang disimpan di perangkat Anda.')) {
+          const originalText = clearIdbButton.innerHTML;
+          clearIdbButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menghapus...';
+          clearIdbButton.disabled = true;
+          
+          try {
+            // Hapus semua data di IndexedDB
+            const result = await this._presenter.clearIndexedDB();
+            
+            // Reset button
+            clearIdbButton.innerHTML = originalText;
+            clearIdbButton.disabled = false;
+            
+            if (!result.error) {
+              this._showMessage('Data lokal berhasil dihapus');
+              // Refresh data dari API
+              await this._presenter.loadStories({ forceRefresh: true });
+            } else {
+              this._showMessage('Gagal menghapus data lokal: ' + result.message, 'error');
+            }
+          } catch (error) {
+            clearIdbButton.innerHTML = originalText;
+            clearIdbButton.disabled = false;
+            this._showMessage('Terjadi kesalahan saat menghapus data lokal', 'error');
+          }
+        }
+      });
+    }
+    
+    if (refreshIdbButton) {
+      refreshIdbButton.addEventListener('click', async () => {
+        const originalText = refreshIdbButton.innerHTML;
+        refreshIdbButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memperbarui...';
+        refreshIdbButton.disabled = true;
+        
+        try {
+          // Perbarui data di IndexedDB
+          const result = await this._presenter.updateIndexedDB();
+          
+          // Reset button
+          refreshIdbButton.innerHTML = originalText;
+          refreshIdbButton.disabled = false;
+          
+          if (!result.error) {
+            this._showMessage('Data lokal berhasil diperbarui');
+          } else {
+            this._showMessage('Gagal memperbarui data lokal: ' + result.message, 'error');
+          }
+        } catch (error) {
+          refreshIdbButton.innerHTML = originalText;
+          refreshIdbButton.disabled = false;
+          this._showMessage('Terjadi kesalahan saat memperbarui data lokal', 'error');
+        }
+      });
+    }
   }
 
   // Method untuk handle refresh button
@@ -351,8 +434,19 @@ export default class HomePage {
           if (isPermissionGranted) {
             try {
               console.log('Permission granted, subscribing to push');
-              // Get subscription
+              // Get subscription dengan VAPID key yang benar
               const subscription = await this._notificationHelper.subscribeToPush();
+              
+              console.log('Subscription object:', subscription);
+              
+              // PERBAIKAN: Pastikan subscription memiliki keys
+              if (!subscription || !subscription.keys || !subscription.keys.p256dh || !subscription.keys.auth) {
+                console.error('Invalid subscription object from subscribeToPush');
+                this._showMessage('Gagal mengaktifkan notifikasi: Subscription tidak valid', 'error');
+                notificationButton.innerHTML = '<i class="fas fa-bell-slash"></i> Aktifkan Notifikasi';
+                notificationButton.disabled = false;
+                return;
+              }
               
               // Check if user is logged in before sending to server
               const token = localStorage.getItem('token');

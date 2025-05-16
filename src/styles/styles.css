@@ -915,3 +915,61 @@ button:focus-visible {
   color: var(--dark-color);
 }
 
+/* Dropdown styles */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+.dropdown-content {
+  display: none;
+  position: absolute;
+  right: 0;
+  background-color: white;
+  min-width: 200px;
+  border: var(--border-width) solid var(--dark-color);
+  box-shadow: var(--shadow-offset) var(--shadow-offset) 0 var(--dark-color);
+  z-index: 1000;
+  margin-top: 10px;
+}
+/* Perbaikan utama di sini - tambahkan padding untuk menjembatani gap */
+.dropdown::after {
+  content: "";
+  position: absolute;
+  height: 10px; /* sesuaikan dengan margin-top dropdown-content */
+  width: 100%;
+  bottom: -10px;
+  left: 0;
+}
+.dropdown:hover .dropdown-content,
+.dropdown-content.show {
+  display: block;
+}
+.dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 15px;
+  border: none;
+  border-bottom: 1px solid #e5e5e5;
+  background-color: white;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 14px;
+}
+.dropdown-item:hover {
+  background-color: var(--light-color);
+}
+.dropdown-item i {
+  margin-right: 8px;
+  width: 16px;
+  text-align: center;
+}
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+@media screen and (max-width: 768px) {
+  .dropdown-content {
+    left: 0;
+    right: auto;
+  }
+}

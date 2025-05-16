@@ -1,12 +1,13 @@
+// src/scripts/data/idb.js
 import { openDB } from 'idb';
 import CONFIG from '../config';
 
 const DATABASE_NAME = CONFIG.DATABASE_NAME;
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 const OBJECT_STORE_NAME = 'stories';
 
 // Buat database baru dengan versi baru untuk memastikan upgrade terjadi
-const dbPromise = openDB(DATABASE_NAME, 2, {
+const dbPromise = openDB(DATABASE_NAME, DATABASE_VERSION, {
   upgrade(database, oldVersion, newVersion, transaction) {
     // Jika database belum ada, buat object store
     if (!database.objectStoreNames.contains(OBJECT_STORE_NAME)) {
@@ -31,10 +32,15 @@ const StoryIdb = {
   // Menyimpan cerita ke IndexedDB
   async saveStory(story) {
     try {
+      if (!story || !story.id) {
+        console.error('Cannot save story: Invalid story object or missing ID');
+        return null;
+      }
+      
       const db = await dbPromise;
       const tx = db.transaction(OBJECT_STORE_NAME, 'readwrite');
       await tx.store.put(story);
-      console.log(`Saved story ${story.id} to IndexedDB`);
+      console.log(`Saved story ${story.id} to IndexedDB, favorited: ${!!story.favorited}`);
       return await tx.done;
     } catch (error) {
       console.error('Error saving story to IndexedDB:', error);
@@ -97,6 +103,11 @@ const StoryIdb = {
   // Mengambil cerita berdasarkan ID
   async getStory(id) {
     try {
+      if (!id) {
+        console.error('Cannot get story: Missing ID');
+        return null;
+      }
+      
       const db = await dbPromise;
       const tx = db.transaction(OBJECT_STORE_NAME, 'readonly');
       const story = await tx.store.get(id);
@@ -108,17 +119,39 @@ const StoryIdb = {
     }
   },
 
-  // Menghapus cerita berdasarkan ID
+  // PERBAIKAN: Menghapus cerita berdasarkan ID (lebih teliti)
   async deleteStory(id) {
     try {
+      if (!id) {
+        console.error('Cannot delete story: Missing ID');
+        return false;
+      }
+      
+      // Periksa dulu apakah cerita ada
       const db = await dbPromise;
+      const checkTx = db.transaction(OBJECT_STORE_NAME, 'readonly');
+      const existingStory = await checkTx.store.get(id);
+      
+      if (!existingStory) {
+        console.log(`Story ${id} not found in IndexedDB, nothing to delete`);
+        return false;
+      }
+      
+      // Hapus cerita dari database
       const tx = db.transaction(OBJECT_STORE_NAME, 'readwrite');
       await tx.store.delete(id);
-      console.log(`Deleted story ${id} from IndexedDB`);
-      return await tx.done;
+      await tx.done;
+      
+      // Verifikasi penghapusan
+      const verifyTx = db.transaction(OBJECT_STORE_NAME, 'readonly');
+      const storyAfter = await verifyTx.store.get(id);
+      const deleted = !storyAfter;
+      
+      console.log(`Deleted story ${id} from IndexedDB. Verification: ${deleted ? 'success' : 'failed'}`);
+      return deleted;
     } catch (error) {
       console.error(`Error deleting story ${id} from IndexedDB:`, error);
-      return null;
+      return false;
     }
   },
   
@@ -170,6 +203,11 @@ const StoryIdb = {
   // Menandai cerita sebagai favorit
   async favoriteStory(id) {
     try {
+      if (!id) {
+        console.error('Cannot favorite story: Missing ID');
+        return false;
+      }
+      
       console.log(`Favoriting story ${id}`);
       const db = await dbPromise;
       const tx = db.transaction(OBJECT_STORE_NAME, 'readwrite');
@@ -179,7 +217,12 @@ const StoryIdb = {
         console.log(`Story ${id} found, setting favorited=true`);
         story.favorited = true;
         await tx.store.put(story);
-        return await tx.done;
+        await tx.done;
+        
+        // Verifikasi perubahan
+        const verifyTx = db.transaction(OBJECT_STORE_NAME, 'readonly');
+        const updatedStory = await verifyTx.store.get(id);
+        return updatedStory && updatedStory.favorited === true;
       }
       
       console.log(`Story ${id} not found in IndexedDB`);
@@ -190,23 +233,19 @@ const StoryIdb = {
     }
   },
   
-  // Menghapus tanda favorit dari cerita
+  // PERBAIKAN: Menghapus tanda favorit dari cerita (DENGAN BENAR-BENAR MENGHAPUS)
   async unfavoriteStory(id) {
     try {
-      console.log(`Unfavoriting story ${id}`);
-      const db = await dbPromise;
-      const tx = db.transaction(OBJECT_STORE_NAME, 'readwrite');
-      const story = await tx.store.get(id);
-      
-      if (story) {
-        console.log(`Story ${id} found, setting favorited=false`);
-        story.favorited = false;
-        await tx.store.put(story);
-        return await tx.done;
+      if (!id) {
+        console.error('Cannot unfavorite story: Missing ID');
+        return false;
       }
       
-      console.log(`Story ${id} not found in IndexedDB`);
-      return false;
+      console.log(`Unfavoriting story ${id}`);
+      
+      // PERBAIKAN: Langsung hapus cerita dari database
+      // Ini merupakan solusi yang direkomendasikan untuk kasus Anda
+      return await this.deleteStory(id);
     } catch (error) {
       console.error(`Error unfavoriting story ${id}:`, error);
       return false;
@@ -216,6 +255,11 @@ const StoryIdb = {
   // Cek apakah cerita difavoritkan
   async isStoryFavorited(id) {
     try {
+      if (!id) {
+        console.error('Cannot check favorited status: Missing ID');
+        return false;
+      }
+      
       const story = await this.getStory(id);
       const isFavorited = story ? story.favorited === true : false;
       console.log(`Checking if story ${id} is favorited: ${isFavorited}`);

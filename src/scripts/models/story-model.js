@@ -1,3 +1,4 @@
+// src/scripts/models/story-model.js
 import StoryAPI from '../data/api';
 import StoryIdb from '../data/idb';
 
@@ -12,12 +13,20 @@ class StoryModel {
       if (!response.error && response.listStory) {
         console.log(`Successfully fetched ${response.listStory.length} stories from API`);
         
-        // BARU: Preserve favorite status dari IndexedDB
+        // Preserve favorite status dari IndexedDB
         const storiesWithFavorites = await this._preserveFavoriteStatus(response.listStory);
         
-        // BARU: SIMPAN SEMUA STORIES KE INDEXEDDB (bukan hanya yang favorit)
-        console.log('Saving all stories to IndexedDB...');
-        await this._syncStoriesWithIndexedDB(storiesWithFavorites);
+        // PERBAIKAN: Tidak langsung menyimpan semua stories
+        // Hanya menyimpan stories yang difavoritkan untuk efisiensi
+        console.log('Preserving favorite stories in IndexedDB...');
+        const favoriteStories = storiesWithFavorites.filter(story => story.favorited);
+        
+        if (favoriteStories.length > 0) {
+          console.log(`Saving ${favoriteStories.length} favorite stories to IndexedDB`);
+          for (const story of favoriteStories) {
+            await StoryIdb.saveStory(story);
+          }
+        }
         
         return {
           ...response,
@@ -51,22 +60,54 @@ class StoryModel {
     }
   }
 
-  // BARU: Method untuk sync semua stories dengan IndexedDB
-  async _syncStoriesWithIndexedDB(stories) {
+  // PERBAIKAN: Method untuk memperbarui atau menghapus data di IndexedDB
+  async updateIndexedDBStorage() {
     try {
-      console.log(`Syncing ${stories.length} stories to IndexedDB`);
+      // Ambil data dari API
+      const response = await StoryAPI.getAllStories({ location: 1 });
       
-      for (const story of stories) {
-        await StoryIdb.saveStory(story);
+      if (!response.error && response.listStory) {
+        // Simpan data ke IndexedDB
+        await StoryIdb.saveStories(response.listStory);
+        
+        return {
+          error: false,
+          message: 'IndexedDB updated successfully'
+        };
       }
       
-      console.log('Stories synced successfully to IndexedDB');
+      return {
+        error: true,
+        message: 'Failed to update IndexedDB'
+      };
     } catch (error) {
-      console.error('Error syncing stories to IndexedDB:', error);
+      console.error('Error updating IndexedDB:', error);
+      return {
+        error: true,
+        message: 'Error updating IndexedDB'
+      };
     }
   }
 
-  // BARU: Method untuk clear dan reload data dari API
+  // Method untuk menghapus semua data di IndexedDB
+  async clearIndexedDBStorage() {
+    try {
+      await StoryIdb.clearStories();
+      
+      return {
+        error: false,
+        message: 'IndexedDB cleared successfully'
+      };
+    } catch (error) {
+      console.error('Error clearing IndexedDB:', error);
+      return {
+        error: true,
+        message: 'Error clearing IndexedDB'
+      };
+    }
+  }
+
+  // Method untuk force refresh data dari API
   async forceRefreshFromAPI(options = {}) {
     try {
       console.log('Force refreshing stories from API...');
@@ -80,17 +121,15 @@ class StoryModel {
         // Preserve favorite status
         const storiesWithFavorites = await this._preserveFavoriteStatus(response.listStory);
         
-        // Clear existing cache dalam IndexedDB dan save yang baru
-        console.log('Clearing and updating IndexedDB...');
+        // PERBAIKAN: Hanya simpan cerita yang difavoritkan
+        const favoriteStories = storiesWithFavorites.filter(story => story.favorited);
         
-        // Ambil favorite stories dulu
-        const favoriteStories = await StoryIdb.getFavoriteStories();
-        
-        // Clear all stories
-        await StoryIdb.clearStories();
-        
-        // Sync ulang dengan data baru
-        await this._syncStoriesWithIndexedDB(storiesWithFavorites);
+        if (favoriteStories.length > 0) {
+          console.log(`Saving ${favoriteStories.length} favorite stories to IndexedDB`);
+          for (const story of favoriteStories) {
+            await StoryIdb.saveStory(story);
+          }
+        }
         
         return {
           ...response,
@@ -131,8 +170,10 @@ class StoryModel {
           favorited: isFavorited
         };
         
-        // Simpan ke IndexedDB jika berhasil
-        await StoryIdb.saveStory(storyWithFavStatus);
+        // PERBAIKAN: Hanya simpan ke IDB jika difavoritkan
+        if (isFavorited) {
+          await StoryIdb.saveStory(storyWithFavStatus);
+        }
         
         // Kembalikan respons dengan status favorit yang diperbarui
         return {
@@ -184,7 +225,7 @@ class StoryModel {
       const response = await StoryAPI.addStory(storyData);
       console.log('Add story API response:', response);
       
-      // BARU: Jika berhasil menambah story, refresh data dari API
+      // Jika berhasil menambah story, refresh data dari API
       if (!response.error) {
         console.log('Story added successfully, refreshing data...');
         // Set flag untuk refresh di home page
@@ -365,26 +406,21 @@ class StoryModel {
     }
   }
   
-  // Menghapus cerita dari favorites
+  // PERBAIKAN: Menghapus cerita dari favorites - METODE INI SEKARANG BENAR-BENAR MENGHAPUS CERITA DARI DATABASE
   async removeStoryFromFavorites(id) {
     try {
       console.log(`Removing story ${id} from favorites`);
       
-      // Ambil cerita dari IndexedDB
-      const story = await StoryIdb.getStory(id);
-      
-      if (story) {
-        // Set favorited status
-        story.favorited = false;
-        
-        // Simpan cerita dengan status favorit
-        await StoryIdb.saveStory(story);
-        console.log(`Story ${id} removed from favorites`);
-        return true;
+      if (!id) {
+        console.error('Invalid story ID for unfavoriting');
+        return false;
       }
       
-      console.error(`Story ${id} not found for unfavoriting`);
-      return false;
+      // PERBAIKAN: Langsung hapus cerita dari IndexedDB daripada hanya mengubah flag favorited
+      const result = await StoryIdb.deleteStory(id);
+      
+      console.log(`Story ${id} delete result: ${result ? 'success' : 'failed'}`);
+      return result;
     } catch (error) {
       console.error('Error removing story from favorites:', error);
       return false;

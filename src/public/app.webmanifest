@@ -46,7 +46,7 @@
     },
     {
       "src": "/icons/icon-384x384.png",
-      "sizes": "384x384",
+      "sizes": "388x388",
       "type": "image/png",
       "purpose": "any"
     },
@@ -60,7 +60,7 @@
   "screenshots": [
     {
       "src": "/screenshots/desktop.png",
-      "sizes": "1280x800",
+      "sizes": "1278x1003",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Homescreen di Desktop"

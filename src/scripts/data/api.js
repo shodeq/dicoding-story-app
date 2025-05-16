@@ -1,3 +1,4 @@
+// src/scripts/data/api.js
 import CONFIG from '../config';
 
 const API_ENDPOINT = {
@@ -8,7 +9,7 @@ const API_ENDPOINT = {
   ADD_STORY: `${CONFIG.BASE_URL}/stories`,
   ADD_STORY_GUEST: `${CONFIG.BASE_URL}/stories/guest`,
   SUBSCRIBE_NOTIFICATION: `${CONFIG.BASE_URL}/notifications/subscribe`,
-  UNSUBSCRIBE_NOTIFICATION: `${CONFIG.BASE_URL}/notifications/unsubscribe`,  // Perbaiki endpoint ini!
+  UNSUBSCRIBE_NOTIFICATION: `${CONFIG.BASE_URL}/notifications/subscribe`, // Endpoint yang benar (DELETE method)
 };
 
 const fetchWithToken = async (url, options = {}) => {
@@ -159,25 +160,16 @@ class StoryAPI {
         throw new Error('Subscription tidak valid');
       }
       
-      // Periksa apakah ada keys dan properti yang diperlukan
+      // PERBAIKAN: Pastikan keys dikirimkan dengan format yang tepat
       if (!subscription.keys || !subscription.keys.p256dh || !subscription.keys.auth) {
-        console.warn('Subscription tidak memiliki keys yang dibutuhkan');
-        
-        // Jika tidak ada keys, kirim hanya endpoint
-        const response = await fetchWithToken(API_ENDPOINT.SUBSCRIBE_NOTIFICATION, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            endpoint: subscription.endpoint,
-          }),
-        });
-        
-        return await response.json();
+        console.warn('Subscription tidak memiliki keys yang lengkap');
+        return {
+          error: true,
+          message: 'Subscription keys tidak lengkap'
+        };
       }
       
-      // Jika ada keys lengkap, kirim data lengkap
+      // Kirim data subscription lengkap dengan format yang benar
       const response = await fetchWithToken(API_ENDPOINT.SUBSCRIBE_NOTIFICATION, {
         method: 'POST',
         headers: {
@@ -197,7 +189,7 @@ class StoryAPI {
       console.error('Error in subscribeNotification:', error);
       return {
         error: true,
-        message: 'Terjadi kesalahan saat berlangganan notifikasi.',
+        message: 'Terjadi kesalahan saat berlangganan notifikasi: ' + error.message,
       };
     }
   }
