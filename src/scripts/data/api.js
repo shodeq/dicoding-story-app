@@ -10,6 +10,7 @@ const API_ENDPOINT = {
   ADD_STORY_GUEST: `${CONFIG.BASE_URL}/stories/guest`,
   SUBSCRIBE_NOTIFICATION: `${CONFIG.BASE_URL}/notifications/subscribe`,
   UNSUBSCRIBE_NOTIFICATION: `${CONFIG.BASE_URL}/notifications/subscribe`, // Endpoint yang benar (DELETE method)
+  NOTIFY_STORY: (id) => `${CONFIG.BASE_URL}/notifications/notify/story/${id}`,  // Menambahkan endpoint untuk trigger notifikasi
 };
 
 const fetchWithToken = async (url, options = {}) => {
@@ -138,13 +139,51 @@ class StoryAPI {
         body: formData,
       });
 
-      return await response.json();
+      const responseData = await response.json();
+      
+      // Jika berhasil menambahkan cerita dan user sudah login, trigger notifikasi
+      if (token && responseData.error === false && responseData.id) {
+        try {
+          // Kirim permintaan untuk trigger notifikasi (dipisahkan dari proses utama)
+          this.triggerStoryNotification(responseData.id).catch(error => {
+            console.warn('Error triggering story notification:', error);
+          });
+        } catch (notifyError) {
+          console.warn('Error preparing notification trigger:', notifyError);
+        }
+      }
+      
+      return responseData;
     } catch (error) {
       console.error('Error in addStory:', error);
       return {
         error: true,
         message: 'Terjadi kesalahan saat menambahkan cerita.',
       };
+    }
+  }
+  
+  /**
+   * Men-trigger server untuk mengirim notifikasi tentang cerita baru
+   * @param {string} storyId - ID cerita
+   * @returns {Promise<Object>} Response dari server
+   */
+  static async triggerStoryNotification(storyId) {
+    try {
+      console.log('Triggering notification for story:', storyId);
+      const response = await fetchWithToken(API_ENDPOINT.NOTIFY_STORY(storyId), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const result = await response.json();
+      console.log('Push notification trigger result:', result);
+      return result;
+    } catch (error) {
+      console.error('Error triggering notification:', error);
+      throw error;
     }
   }
 
@@ -160,7 +199,7 @@ class StoryAPI {
         throw new Error('Subscription tidak valid');
       }
       
-      // PERBAIKAN: Pastikan keys dikirimkan dengan format yang tepat
+      // Pastikan keys dikirimkan dengan format yang tepat
       if (!subscription.keys || !subscription.keys.p256dh || !subscription.keys.auth) {
         console.warn('Subscription tidak memiliki keys yang lengkap');
         return {
@@ -168,6 +207,14 @@ class StoryAPI {
           message: 'Subscription keys tidak lengkap'
         };
       }
+      
+      console.log('Mengirim data subscription ke server:', {
+        endpoint: subscription.endpoint,
+        keys: {
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth,
+        },
+      });
       
       // Kirim data subscription lengkap dengan format yang benar
       const response = await fetchWithToken(API_ENDPOINT.SUBSCRIBE_NOTIFICATION, {
@@ -184,7 +231,9 @@ class StoryAPI {
         }),
       });
       
-      return await response.json();
+      const result = await response.json();
+      console.log('Server subscription response:', result);
+      return result;
     } catch (error) {
       console.error('Error in subscribeNotification:', error);
       return {
@@ -205,6 +254,8 @@ class StoryAPI {
         throw new Error('Endpoint tidak valid');
       }
       
+      console.log('Mengirim permintaan unsubscribe ke server dengan endpoint:', endpoint);
+      
       const response = await fetchWithToken(API_ENDPOINT.UNSUBSCRIBE_NOTIFICATION, {
         method: 'DELETE',
         headers: {
@@ -215,7 +266,9 @@ class StoryAPI {
         }),
       });
       
-      return await response.json();
+      const result = await response.json();
+      console.log('Server unsubscription response:', result);
+      return result;
     } catch (error) {
       console.error('Error in unsubscribeNotification:', error);
       return {

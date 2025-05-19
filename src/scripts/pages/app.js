@@ -1,18 +1,25 @@
 import routes from '../routes/routes';
 import { getActiveRoute } from '../routes/url-parser';
 import STORAGE from '../utils/storage';
+import NotificationHelper from '../utils/notification';
 
 class App {
   #content = null;
   #drawerButton = null;
   #navigationDrawer = null;
   #authNavItem = null;
+  #notificationHelper = null;
 
   constructor({ navigationDrawer, drawerButton, content }) {
     this.#content = content;
     this.#drawerButton = drawerButton;
     this.#navigationDrawer = navigationDrawer;
     this.#authNavItem = document.getElementById('auth-nav-item');
+    
+    // Inisialisasi helper notifikasi
+    if (NotificationHelper.isNotificationSupported()) {
+      this.#notificationHelper = new NotificationHelper();
+    }
 
     this.#setupDrawer();
     this.#updateAuthNav();
@@ -39,19 +46,27 @@ class App {
     });
   }
   
-  #updateAuthNav() {
+  async #updateAuthNav() {
     // Cek status login
     const isLoggedIn = STORAGE.isLoggedIn();
     const userData = STORAGE.getUserData();
     
     if (isLoggedIn && userData) {
-      // Jika sudah login, ubah tombol "Masuk" menjadi "Keluar"
+      // Jika sudah login, ubah tombol "Masuk" menjadi "Keluar" dan tambahkan tombol notifikasi
+      const notificationButtonHtml = this.#notificationHelper ? 
+        `<button id="notification-button" class="notification-button">
+           <i class="fas fa-bell"></i> Notifikasi
+         </button>` : '';
+         
       this.#authNavItem.innerHTML = `
         <div class="auth-nav-container">
           <span class="user-greeting">Halo, ${userData.name}</span>
-          <button id="logout-button" class="logout-button">
-            <i class="fas fa-sign-out-alt"></i> Keluar
-          </button>
+          <div class="auth-buttons">
+            ${notificationButtonHtml}
+            <button id="logout-button" class="logout-button">
+              <i class="fas fa-sign-out-alt"></i> Keluar
+            </button>
+          </div>
         </div>
       `;
       
@@ -63,6 +78,15 @@ class App {
           this.#handleLogout();
         });
       }
+      
+      // Event listener dan update state untuk tombol notifikasi
+      if (this.#notificationHelper) {
+        const notificationButton = document.getElementById('notification-button');
+        if (notificationButton) {
+          await this.#updateNotificationButtonState();
+          notificationButton.addEventListener('click', () => this.#handleNotificationButton());
+        }
+      }
     } else {
       // Jika belum login, tampilkan tombol "Masuk"
       this.#authNavItem.innerHTML = `
@@ -71,8 +95,63 @@ class App {
     }
   }
   
+  async #updateNotificationButtonState() {
+    if (!this.#notificationHelper) return;
+    
+    const notificationButton = document.getElementById('notification-button');
+    if (!notificationButton) return;
+    
+    try {
+      const subscription = await this.#notificationHelper.getSubscription();
+      
+      if (subscription) {
+        notificationButton.classList.add('subscribed');
+        notificationButton.innerHTML = `<i class="fas fa-bell"></i> Notifikasi Aktif`;
+      } else {
+        notificationButton.classList.remove('subscribed');
+        notificationButton.innerHTML = `<i class="fas fa-bell"></i> Aktifkan Notifikasi`;
+      }
+    } catch (error) {
+      console.error('Error checking subscription status:', error);
+      notificationButton.classList.remove('subscribed');
+      notificationButton.innerHTML = `<i class="fas fa-bell"></i> Aktifkan Notifikasi`;
+    }
+  }
+  
+  async #handleNotificationButton() {
+    if (!this.#notificationHelper) return;
+    
+    try {
+      const subscription = await this.#notificationHelper.getSubscription();
+      
+      if (subscription) {
+        // Unsubscribe jika sudah subscribe
+        const unsubscribed = await this.#notificationHelper.unsubscribeFromPush();
+        if (unsubscribed) {
+          this.#showMessage('Notifikasi berhasil dinonaktifkan');
+        } else {
+          this.#showMessage('Gagal menonaktifkan notifikasi');
+        }
+      } else {
+        // Subscribe jika belum
+        const subscribed = await this.#notificationHelper.setupPushNotification();
+        if (subscribed) {
+          this.#showMessage('Notifikasi berhasil diaktifkan');
+        } else {
+          this.#showMessage('Gagal mengaktifkan notifikasi');
+        }
+      }
+      
+      // Update status tombol
+      await this.#updateNotificationButtonState();
+    } catch (error) {
+      console.error('Error handling notification button:', error);
+      this.#showMessage('Terjadi kesalahan saat mengatur notifikasi');
+    }
+  }
+  
   #handleLogout() {
-    // BARU: Konfirmasi logout
+    // Konfirmasi logout
     if (confirm('Yakin ingin keluar?')) {
       // Hapus data auth dari localStorage
       STORAGE.clearAuthData();
@@ -117,6 +196,43 @@ class App {
     }, 3000);
   }
 
+  /**
+   * Setup web push notification
+   * @private
+   */
+  async #setupNotification() {
+    try {
+      if (!this.#notificationHelper) {
+        console.log('Browser tidak mendukung notifikasi');
+        return;
+      }
+      
+      // Hanya setup notifikasi jika user sudah login
+      if (!STORAGE.isLoggedIn()) {
+        console.log('User belum login, skip notification setup');
+        return;
+      }
+      
+      // Cek status subscription
+      const subscription = await this.#notificationHelper.getSubscription();
+      
+      // Jika belum subscribe dan user sudah memberikan izin, setup subscription
+      if (!subscription && this.#notificationHelper.hasPermission()) {
+        console.log('User telah memberikan izin notifikasi, tapi belum subscribe. Setup subscription otomatis...');
+        await this.#notificationHelper.setupPushNotification();
+        console.log('Auto subscription selesai');
+        
+        // Update button state jika ada
+        await this.#updateNotificationButtonState();
+      }
+      
+      // Debug status notifikasi
+      await this.#notificationHelper.debugPushStatus();
+    } catch (error) {
+      console.error('Error setting up notification:', error);
+    }
+  }
+
   async renderPage() {
     try {
       const url = getActiveRoute();
@@ -133,7 +249,12 @@ class App {
       }
       
       // Update auth nav setiap kali halaman di-render
-      this.#updateAuthNav();
+      await this.#updateAuthNav();
+      
+      // Setup notification pada halaman utama atau setelah login
+      if (url === '/' || url === '/home') {
+        await this.#setupNotification();
+      }
       
       // Aplikasikan smooth scroll untuk skip link
       this._skipToContent();

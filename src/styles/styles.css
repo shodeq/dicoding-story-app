@@ -973,3 +973,58 @@ button:focus-visible {
     right: auto;
   }
 }
+
+
+
+
+
+
+
+
+/* Styles tambahan untuk tombol dan elemen notifikasi */
+.notification-button {
+  background-color: var(--secondary-color);
+  color: white;
+  border: 2px solid var(--dark-color);
+  box-shadow: 2px 2px 0 var(--dark-color);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s;
+  margin-right: 10px;
+}
+
+.notification-button:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 var(--dark-color);
+}
+
+.notification-button.subscribed {
+  background-color: var(--accent-color);
+  color: var(--dark-color);
+}
+
+.auth-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Perbaikan responsive */
+@media screen and (max-width: 600px) {
+  .auth-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .notification-button,
+  .logout-button {
+    width: 100%;
+    justify-content: center;
+    margin-right: 0;
+    margin-bottom: 5px;
+  }
+}

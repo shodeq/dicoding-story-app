@@ -103,39 +103,74 @@ registerRoute(
   })
 );
 
-// Event untuk push notification
+// PERBAIKAN: Event untuk push notification
 self.addEventListener('push', (event) => {
-  let notificationData = {
-    title: 'Notifikasi Baru',
-    options: {
-      body: 'Anda menerima notifikasi baru',
-      icon: '/favicon.png',
-    },
-  };
+  console.log('Push event received:', event);
+  
+  // Fungsi untuk menampilkan notifikasi dan melakukan logging yang tepat
+  async function showNotification() {
+    // Default data jika tidak ada data dari event
+    let notificationData = {
+      title: 'Notifikasi Baru',
+      options: {
+        body: 'Anda menerima notifikasi baru dari Story App',
+        icon: '/favicon.png',
+        badge: '/favicon.png'
+      },
+    };
 
-  if (event.data) {
-    try {
-      const data = event.data.json();
-      notificationData = {
-        title: data.title || notificationData.title,
-        options: {
-          ...notificationData.options,
-          body: data.options?.body || notificationData.options.body,
-        },
-      };
-    } catch (error) {
-      console.error('Error parsing push notification data:', error);
+    // Coba parse data JSON dari event
+    if (event.data) {
+      try {
+        const data = event.data.json();
+        console.log('Received push data:', data);
+        
+        // Update notification data dengan data dari server
+        notificationData = {
+          title: data.title || notificationData.title,
+          options: {
+            ...notificationData.options,
+            body: data.options?.body || data.body || notificationData.options.body,
+            icon: data.options?.icon || notificationData.options.icon,
+            badge: data.options?.badge || notificationData.options.badge,
+            // Tambahkan data lain yang mungkin dikirim server
+            data: data.data || {}
+          },
+        };
+      } catch (error) {
+        console.error('Error parsing push notification data:', error);
+        // Jika gagal parse JSON, coba sebagai text
+        try {
+          const text = event.data.text();
+          notificationData.options.body = text;
+        } catch (textError) {
+          console.error('Error getting push text:', textError);
+        }
+      }
     }
+
+    console.log('Showing notification with data:', notificationData);
+    
+    // Tampilkan notifikasi
+    return self.registration.showNotification(notificationData.title, notificationData.options);
   }
 
-  event.waitUntil(
-    self.registration.showNotification(notificationData.title, notificationData.options)
-  );
+  // Gunakan waitUntil untuk menjaga service worker tetap aktif sampai notifikasi ditampilkan
+  event.waitUntil(showNotification());
 });
 
 // Event ketika notifikasi diklik
 self.addEventListener('notificationclick', (event) => {
+  console.log('Notification clicked:', event.notification);
+  
+  // Tutup notifikasi
   event.notification.close();
+
+  // Tentukan URL tujuan (bisa dari data notifikasi jika ada)
+  let targetUrl = '/';
+  if (event.notification.data && event.notification.data.url) {
+    targetUrl = event.notification.data.url;
+  }
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
@@ -143,11 +178,11 @@ self.addEventListener('notificationclick', (event) => {
         // Jika sudah ada window yang terbuka, fokus ke sana
         if (clientsList.length > 0) {
           const client = clientsList[0];
-          client.navigate('/');
+          client.navigate(targetUrl);
           return client.focus();
         }
         // Jika tidak ada window yang terbuka, buka yang baru
-        return clients.openWindow('/');
+        return clients.openWindow(targetUrl);
       })
   );
 });

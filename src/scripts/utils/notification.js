@@ -59,6 +59,7 @@ class NotificationHelper {
     try {
       // Dapatkan service worker yang sudah terdaftar atau daftarkan yang baru
       const registration = await navigator.serviceWorker.ready;
+      console.log('Service worker is ready:', registration);
       return registration;
     } catch (error) {
       console.error('Error getting service worker registration:', error);
@@ -68,7 +69,6 @@ class NotificationHelper {
   
   /**
    * Berlangganan Push Notification
-   * PERBAIKAN: Kembalikan objek hibrida dengan keys yang siap digunakan dan method unsubscribe
    * @returns {Promise<Object>} Promise yang berisi data langganan dalam format yang siap digunakan
    */
   async subscribeToPush() {
@@ -119,7 +119,7 @@ class NotificationHelper {
             await existingSubscription.unsubscribe();
             // Lanjutkan untuk membuat subscription baru di bawah
           } else {
-            // PERBAIKAN: Buat objek hibrida dengan data dari JSON dan objek asli
+            // Kembalikan object dengan format yang benar
             return this._createHybridSubscriptionObject(existingSubscription);
           }
         }
@@ -131,7 +131,7 @@ class NotificationHelper {
         
         console.log('Created new push subscription:', newSubscription);
         
-        // PERBAIKAN: Buat objek hibrida dengan data dari JSON dan objek asli
+        // Kembalikan objek dengan format yang benar
         return this._createHybridSubscriptionObject(newSubscription);
         
       } catch (subscribeError) {
@@ -145,10 +145,9 @@ class NotificationHelper {
   }
   
   /**
-   * PERBAIKAN: Membuat objek hibrida yang menggabungkan PushSubscription asli dan datanya
-   * Ini memberikan data yang siap digunakan dan juga menyediakan method unsubscribe()
+   * Membuat objek dengan format yang benar untuk API server
    * @param {PushSubscription} subscription - Objek PushSubscription asli
-   * @returns {Object} Objek hibrida dengan data dan metode unsubscribe
+   * @returns {Object} Objek dengan format yang siap digunakan
    * @private
    */
   _createHybridSubscriptionObject(subscription) {
@@ -157,11 +156,19 @@ class NotificationHelper {
     // Ambil data dari toJSON()
     const subscriptionData = subscription.toJSON();
     
+    if (!subscriptionData.keys) {
+      console.error('PushSubscription tidak memiliki keys yang diperlukan');
+      return null;
+    }
+    
     // Buat objek baru dengan properti dari JSON
     const hybridSubscription = {
       endpoint: subscriptionData.endpoint,
       expirationTime: subscriptionData.expirationTime,
-      keys: subscriptionData.keys, // Keys tersedia langsung di objek
+      keys: {
+        p256dh: subscriptionData.keys.p256dh,
+        auth: subscriptionData.keys.auth
+      },
       
       // Tambahkan method unsubscribe yang memanggil method asli
       unsubscribe: async function() {
@@ -178,7 +185,7 @@ class NotificationHelper {
     };
     
     // Verifikasi dan log untuk debugging
-    console.log('Created hybrid subscription object with keys:', hybridSubscription.keys);
+    console.log('Created subscription object with keys:', hybridSubscription.keys);
     
     return hybridSubscription;
   }
@@ -250,7 +257,7 @@ class NotificationHelper {
   
   /**
    * Memeriksa apakah pengguna telah berlangganan Push Notification
-   * @returns {Promise<PushSubscription|null>} Promise yang berisi data langganan atau null
+   * @returns {Promise<Object|null>} Promise yang berisi data langganan atau null
    */
   async getSubscription() {
     try {
@@ -270,7 +277,7 @@ class NotificationHelper {
         console.log('Current subscription status:', subscription ? 'Subscribed' : 'Not subscribed');
         
         if (subscription) {
-          // PERBAIKAN: Kembalikan objek hibrida untuk kompatibilitas
+          // Kembalikan objek dengan format yang benar
           return this._createHybridSubscriptionObject(subscription);
         }
         
@@ -430,6 +437,55 @@ class NotificationHelper {
       }
     }
     return null;
+  }
+  
+  /**
+   * Mendaftarkan dan berlangganan notifikasi di server
+   * @returns {Promise<boolean>} Status berlangganan
+   */
+  async setupPushNotification() {
+    try {
+      // 1. Cek dukungan browser
+      if (!NotificationHelper.isNotificationSupported()) {
+        console.warn('Browser tidak mendukung push notification');
+        return false;
+      }
+      
+      // 2. Minta izin notifikasi
+      const permissionGranted = await this.requestPermission();
+      if (!permissionGranted) {
+        console.warn('Izin notifikasi tidak diberikan');
+        return false;
+      }
+      
+      // 3. Dapatkan subscription (buat baru jika belum ada)
+      const subscription = await this.subscribeToPush();
+      if (!subscription) {
+        console.error('Gagal mendapatkan subscription');
+        return false;
+      }
+      
+      // 4. Kirim subscription ke server
+      try {
+        console.log('Mengirim subscription ke server:', subscription);
+        const result = await StoryAPI.subscribeNotification(subscription);
+        console.log('Hasil subscribe notifikasi ke server:', result);
+        
+        if (result.error) {
+          console.error('Server menolak subscription:', result.message);
+          return false;
+        }
+        
+        console.log('Berhasil berlangganan notifikasi di server');
+        return true;
+      } catch (apiError) {
+        console.error('Error saat mengirim subscription ke server:', apiError);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error saat setup push notification:', error);
+      return false;
+    }
   }
 }
 

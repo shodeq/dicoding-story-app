@@ -10,9 +10,10 @@ import './components/story-form.js';
 import App from './pages/app';
 import STORAGE from './utils/storage';
 import swRegister from './utils/sw-register';
+import NotificationHelper from './utils/notification';
 import 'regenerator-runtime';
 
-// Menambahkan CSS untuk auth-nav dan offline message
+// Menambahkan CSS untuk auth-nav, offline message, dan notifikasi
 const style = document.createElement('style');
 style.textContent = `
   .action-group {
@@ -109,6 +110,30 @@ style.textContent = `
     font-size: 1.2rem;
   }
   
+  .notification-button {
+    background-color: var(--secondary-color);
+    color: white;
+    border: 2px solid var(--dark-color);
+    box-shadow: 2px 2px 0 var(--dark-color);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+  }
+  
+  .notification-button:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--dark-color);
+  }
+  
+  .notification-button.subscribed {
+    background-color: var(--accent-color);
+    color: var(--dark-color);
+  }
+  
   @media screen and (min-width: 1000px) {
     .auth-nav-container {
       flex-direction: row;
@@ -147,13 +172,18 @@ function updateAuthNav() {
   const userData = STORAGE.getUserData();
   
   if (isLoggedIn && userData) {
-    // Jika sudah login, ubah tombol "Masuk" menjadi "Keluar"
+    // Jika sudah login, ubah tombol "Masuk" menjadi "Keluar" dan tambahkan tombol notifikasi
     authNavItem.innerHTML = `
       <div class="auth-nav-container">
         <span class="user-greeting">Halo, ${userData.name}</span>
-        <button id="logout-button" class="logout-button">
-          <i class="fas fa-sign-out-alt"></i> Keluar
-        </button>
+        <div class="auth-buttons">
+          <button id="notification-button" class="notification-button">
+            <i class="fas fa-bell"></i> Notifikasi
+          </button>
+          <button id="logout-button" class="logout-button">
+            <i class="fas fa-sign-out-alt"></i> Keluar
+          </button>
+        </div>
       </div>
     `;
     
@@ -165,11 +195,79 @@ function updateAuthNav() {
         handleLogout();
       });
     }
+    
+    // Event listener untuk tombol notifikasi
+    const notificationButton = document.getElementById('notification-button');
+    if (notificationButton) {
+      updateNotificationButtonState();
+      notificationButton.addEventListener('click', handleNotificationButton);
+    }
   } else {
     // Jika belum login, tampilkan tombol "Masuk"
     authNavItem.innerHTML = `
       <a href="#/login"><i class="fas fa-sign-in-alt"></i> Masuk</a>
     `;
+  }
+}
+
+// Update status tombol notifikasi
+async function updateNotificationButtonState() {
+  const notificationButton = document.getElementById('notification-button');
+  if (!notificationButton) return;
+  
+  // Cek apakah browser mendukung Push API
+  if (!NotificationHelper.isNotificationSupported()) {
+    notificationButton.style.display = 'none';
+    return;
+  }
+  
+  try {
+    const notificationHelper = new NotificationHelper();
+    const subscription = await notificationHelper.getSubscription();
+    
+    if (subscription) {
+      notificationButton.classList.add('subscribed');
+      notificationButton.innerHTML = `<i class="fas fa-bell"></i> Notifikasi Aktif`;
+    } else {
+      notificationButton.classList.remove('subscribed');
+      notificationButton.innerHTML = `<i class="fas fa-bell"></i> Aktifkan Notifikasi`;
+    }
+  } catch (error) {
+    console.error('Error checking subscription status:', error);
+    notificationButton.classList.remove('subscribed');
+    notificationButton.innerHTML = `<i class="fas fa-bell"></i> Aktifkan Notifikasi`;
+  }
+}
+
+// Handle klik tombol notifikasi
+async function handleNotificationButton() {
+  const notificationHelper = new NotificationHelper();
+  const subscription = await notificationHelper.getSubscription();
+  
+  try {
+    if (subscription) {
+      // Unsubscribe jika sudah subscribe
+      const unsubscribed = await notificationHelper.unsubscribeFromPush();
+      if (unsubscribed) {
+        showMessage('Notifikasi berhasil dinonaktifkan');
+      } else {
+        showMessage('Gagal menonaktifkan notifikasi');
+      }
+    } else {
+      // Subscribe jika belum
+      const subscribed = await notificationHelper.setupPushNotification();
+      if (subscribed) {
+        showMessage('Notifikasi berhasil diaktifkan');
+      } else {
+        showMessage('Gagal mengaktifkan notifikasi');
+      }
+    }
+    
+    // Update status tombol
+    updateNotificationButtonState();
+  } catch (error) {
+    console.error('Error handling notification button:', error);
+    showMessage('Terjadi kesalahan saat mengatur notifikasi');
   }
 }
 
@@ -196,7 +294,7 @@ function showMessage(message) {
     document.body.removeChild(existingToast);
   }
   
-// Buat elemen toast
+  // Buat elemen toast
   const toast = document.createElement('div');
   toast.classList.add('toast-message');
   toast.textContent = message;
@@ -234,7 +332,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateAuthNav();
   
   // Daftarkan Service Worker
-  await swRegister();
+  const registration = await swRegister();
+  
+  // Setup notifikasi jika user sudah login
+  if (STORAGE.isLoggedIn() && registration) {
+    try {
+      // Cek status subscription dan update tombol
+      updateNotificationButtonState();
+    } catch (error) {
+      console.error('Error setting up notification state:', error);
+    }
+  }
   
   await app.renderPage();
 
